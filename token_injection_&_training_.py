@@ -336,3 +336,153 @@ plt.tight_layout(); plt.savefig(RESULTS/"hero.png", dpi=200)
 print("Saved", RESULTS/"hero.png")
 
 """tbc"""
+
+
+import torch, math, textwrap, os, json
+from pathlib import Path
+from transformers import LogitsProcessor, LogitsProcessorList, NoRepeatNGramLogitsProcessor, RepetitionPenaltyLogitsProcessor
+
+# Logit scaling (boost/suppress token sets)
+class LogitScaler(LogitsProcessor):
+    def __init__(self, ids, delta): self.ids=set(int(i) for i in ids); self.delta=float(delta)
+    def __call__(self, input_ids, scores):
+        if self.ids: scores[:, list(self.ids)] += self.delta
+        return scores
+
+# Adaptive temperature (entropy-targeted)
+class AdaptiveTemp(LogitsProcessor):
+    def __init__(self, base_T=0.9, target_H=3.0, k=0.15, T_min=0.6, T_max=1.3):
+        self.base_T, self.target_H, self.k, self.T_min, self.T_max = base_T, target_H, k, T_min, T_max
+    def __call__(self, input_ids, scores):
+        p = torch.softmax(scores, dim=-1)
+        H = -(p * (p.clamp_min(1e-12)).log()).sum(-1, keepdim=True)
+        T = (self.base_T * torch.exp(self.k * (H - self.target_H))).clamp(self.T_min, self.T_max)
+        return scores / T
+
+# Per-token temperature (hot/cool word sets)
+class PerTokenTemp(LogitsProcessor):
+    def __init__(self, hot_ids, cool_ids, Thot=1.15, Tcool=0.85):
+        self.hot, self.cool = set(hot_ids), set(cool_ids); self.Th, self.Tc = float(Thot), float(Tcool)
+    def __call__(self, input_ids, scores):
+        if self.hot:  scores[:, list(self.hot)]  /= self.Th
+        if self.cool: scores[:, list(self.cool)] /= self.Tc
+        return scores
+
+# Gate stopword loops
+class GateStops(LogitsProcessor):
+    def __init__(self, stop_ids, penalty=5.0): self.stop=set(stop_ids); self.penalty=float(penalty)
+    def __call__(self, input_ids, scores):
+        last = int(input_ids[0, -1])
+        if last in self.stop: scores[:, list(self.stop)] -= self.penalty
+        return scores
+
+# Entmax wrapper (optional)
+try:
+    from entmax import entmax15
+    class EntmaxAsLogits(LogitsProcessor):
+        def __call__(self, input_ids, scores):
+            p = entmax15(scores, dim=-1)
+            return p.clamp_min(1e-12).log()  # re-logitify for downstream processors
+    ENTMAX_OK = True
+except Exception:
+    ENTMAX_OK = False
+
+# Logit blend (Wake vs Base)
+class LogitBlend(LogitsProcessor):
+    def __init__(self, base_model, lam=0.2):
+        self.base = base_model; self.lam=float(lam)
+    @torch.no_grad()
+    def __call__(self, input_ids, scores):
+        base_scores = self.base(input_ids=input_ids).logits[:, -1, :]
+        return (1 - self.lam) * scores + self.lam * base_scores
+
+# Builder
+def build_portfolio_processors(tok, new_terms, *,
+                               wake_boost=0.35, stop_suppress=0.25,
+                               use_adaptive_temp=True, base_T=0.9, target_H=3.0, k=0.15,
+                               per_token_temp=True, Thot=1.12, Tcool=0.88,
+                               gate_stops=True, gate_penalty=5.0,
+                               use_entmax=False,
+                               use_blend=False, base_model=None, blend_lambda=0.2):
+    # Wake ids (+ ▁ variants)
+    wake_ids=set()
+    for t in new_terms:
+        for form in (t, "▁"+t if not t.startswith("▁") else t):
+            tid = tok.convert_tokens_to_ids(form)
+            if tid != tok.unk_token_id: wake_ids.add(tid)
+
+    # tiny stopword set
+    stopish = "the of and to a in that it is you i me we he she they my your his her our their for on as with was be are this at from or so if but by have has had not do did does can will would could should".split()
+    stop_ids = {tok.convert_tokens_to_ids(w) for w in stopish if tok.convert_tokens_to_ids(w)!=tok.unk_token_id}
+
+    procs = LogitsProcessorList([
+        RepetitionPenaltyLogitsProcessor(1.20),
+        NoRepeatNGramLogitsProcessor(4),
+        LogitScaler(wake_ids, +wake_boost),
+        LogitScaler(stop_ids, -stop_suppress),
+    ])
+
+    if use_adaptive_temp: procs.append(AdaptiveTemp(base_T=base_T, target_H=target_H, k=k))
+    if per_token_temp:    procs.append(PerTokenTemp(wake_ids, stop_ids, Thot=Thot, Tcool=Tcool))
+    if gate_stops:        procs.append(GateStops(stop_ids, penalty=gate_penalty))
+    if use_entmax and ENTMAX_OK: procs.append(EntmaxAsLogits())
+    if use_blend:
+        assert base_model is not None, "use_blend=True requires base_model"
+        procs.append(LogitBlend(base_model, lam=blend_lambda))
+    return procs
+
+"""steering vector"""
+
+# Compute a single Joyce direction from embeddings
+with torch.no_grad():
+    E = model.get_input_embeddings().weight.detach()
+    ids_wake = torch.tensor([tok.convert_tokens_to_ids(t) for t in new_terms if tok.convert_tokens_to_ids(t)!=tok.unk_token_id], device=E.device)
+    ids_anchor = torch.tensor([tok.convert_tokens_to_ids(t) for t in ["book","river","history","night","language"] if tok.convert_tokens_to_ids(t)!=tok.unk_token_id], device=E.device)
+    joyce_dir = (E[ids_wake].mean(0) - E[ids_anchor].mean(0))
+    joyce_dir = joyce_dir / (joyce_dir.norm()+1e-9)
+
+orig_forward = model.forward
+def forward_steered(*args, strength=0.8, **kwargs):
+    out = orig_forward(*args, **kwargs)
+    output_hidden_states=True
+    if hasattr(out, "hidden_states") and out.hidden_states is not None:
+        hs = out.hidden_states[-1] + strength * joyce_dir
+        out.logits = model.lm_head(hs)
+    return out
+
+model.config.output_hidden_states = True
+model.forward = forward_steered
+
+"""helper for sampling"""
+
+def complete_portfolio(prompt, processors, max_new_tokens=120, temperature=0.9, top_p=0.88, top_k=40):
+    ins = tok(prompt, return_tensors="pt").to(model.device)
+    with torch.no_grad():
+        out = model.generate(
+            **ins, max_new_tokens=max_new_tokens, do_sample=True,
+            temperature=temperature, top_p=top_p, top_k=top_k,
+            logits_processor=processors, renormalize_logits=True,
+            no_repeat_ngram_size=4, cache_implementation="static",
+            output_hidden_states=getattr(model.config, "output_hidden_states", False)
+        )
+    return tok.decode(out[0], skip_special_tokens=True)
+
+"""Minimal ablation grid"""
+
+def save_ablation_grid(new_terms, prompts, base_model=None):
+    Path("results").mkdir(exist_ok=True)
+    configs = [
+        ("baseline", dict(wake_boost=0.0, stop_suppress=0.0, use_adaptive_temp=False, per_token_temp=False, gate_stops=False, use_entmax=False, use_blend=False)),
+        ("logit_surgery+adaptT", dict(wake_boost=0.35, stop_suppress=0.25, use_adaptive_temp=True, per_token_temp=True, gate_stops=True)),
+        ("entmax", dict(wake_boost=0.35, stop_suppress=0.25, use_adaptive_temp=False, per_token_temp=False, gate_stops=False, use_entmax=True)),
+        ("blend_base", dict(wake_boost=0.25, stop_suppress=0.15, use_blend=True)),
+    ]
+    lines = ["# Ablation Samples\n"]
+    for name, kw in configs:
+        procs = build_portfolio_processors(tok, new_terms, base_model=base_model, **kw)
+        lines.append(f"## {name}\n")
+        for p in prompts:
+            txt = complete_portfolio(p, procs, max_new_tokens=120)
+            lines += [f"### {p}\n", textwrap.fill(txt.replace("\n"," "), width=92), "\n"]
+    Path("results/ablation_samples.md").write_text("\n".join(lines), encoding="utf-8")
+    print("Wrote results/ablation_samples.md")
