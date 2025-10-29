@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+title: Morphological Analysis of Finnegans Wake
+message: 'If you use this dataset, please cite it as below.'
+type: dataset
+authors:
+  - family-names: Biehle
+    given-names: May 
+    orcid: 'https://orcid.org/0009-0006-5484-4534' 
+repository-code: 'https://github.com/yourusername/wake-morpheme-dataset'
+keywords:
+  - James Joyce
+  - Finnegans Wake
+  - morphology
+  - digital humanities
+  - neologisms
+license: CC-BY-4.0
+version: 1.0.0
+date-released: '2024-10-29'
