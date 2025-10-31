@@ -1,0 +1,20 @@
+model_name: TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T
+alpha: 0.25
+noise_std_scale: 0.01
+phase1:
+  lr: 5.0e-4
+  epochs: 1
+  ptd_bs: 8
+  grad_accum: 2
+  save_steps: 200
+phase2:
+  lr: 2.0e-5
+  epochs: 2
+  warmup_ratio: 0.10
+  ptd_bs: 8
+  grad_accum: 2
+  weight_decay: 0.01
+  save_steps: 200
+eval:
+  topk: 5
+  tsne: true
