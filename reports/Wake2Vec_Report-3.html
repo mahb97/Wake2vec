@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wake2Vec — Interim Report</title>
+<style>
+  /* Print-friendly, black & white, Times New Roman */
+  :root {
+    --fg: #000;
+    --bg: #fff;
+    --muted: #222;
+    --rule: #000;
+  }
+  html, body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Times New Roman", Times, serif;
+    line-height: 1.35;
+    -webkit-font-smoothing: antialiased;
+    font-size: 16px;
+    margin: 0;
+    padding: 0;
+  }
+  .container {
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 0 1rem 4rem;
+  }
+  h1, h2, h3 {
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    margin: 1.1rem 0 0.6rem;
+  }
+  h1 { font-size: 1.9rem; border-bottom: 2px solid var(--rule); padding-bottom: .4rem; }
+  h2 { font-size: 1.35rem; margin-top: 1.5rem; }
+  h3 { font-size: 1.1rem; margin-top: 1rem; }
+  p, li { font-size: 1rem; margin: 0.5rem 0; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: .95rem; }
+  .meta { color: var(--muted); margin-bottom: 1rem; }
+  .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+  .figure { border: 1px solid var(--rule); padding: .75rem; }
+  .figure img { width: 100%; height: auto; display: block; }
+  .caption { font-size: .95rem; color: var(--muted); margin-top: .4rem; }
+  .kv { border: 1px solid var(--rule); border-collapse: collapse; width: 100%; }
+  .kv th, .kv td { border: 1px solid var(--rule); padding: .4rem .5rem; text-align: left; }
+  .hr { border: 0; border-top: 2px solid var(--rule); margin: 1.25rem 0; }
+  .small { font-size: .95rem; }
+  .muted { color: var(--muted); }
+  .box { border: 1px solid var(--rule); padding: .75rem; }
+  @media print {
+    a::after { content: " (" attr(href) ")"; font-size: .9em; }
+    .no-print { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Wake2Vec — Interim Report</h1>
+  <p class="meta"><strong>Date:</strong> 31 Oct 2025 &nbsp;|&nbsp; <strong>Author:</strong> Your Name &nbsp;|&nbsp; <strong>Repo:</strong> Wake2Vec</p>
+
+  <h2>1) Executive Summary</h2>
+  <p>Wake2Vec evaluates whether morphology-aware token expansion can integrate <em>Joyce-style neologisms</em> into a small GPT-style model without destabilising its embedding geometry. Prefix/suffix lexica are curated, synthetic Wake-style forms are generated, the tokenizer is expanded, and new embeddings are initialised by morpheme composition. A two-phase schedule (embedding-only warm-up → short full fine-tune) yields coherent integration: the latest run adds <strong>447 tokens</strong> with a mean <strong>top-5 neighbor overlap ≈ 3.7/5</strong> and <strong>small positive norm shifts</strong>, consistent with stable geometry rather than collapse.</p>
+
+  <h2>2) Data and Token Expansion</h2>
+  <ul>
+    <li><strong>Base text:</strong> <em>Finnegans Wake</em> plain text (<code>FW_TEXT</code>).</li>
+    <li><strong>Morpheme lexicon:</strong> curated prefixes/suffixes with example words (<code>MORPHEME_DATA</code>).</li>
+    <li><strong>Synthetic generator:</strong> samples <code>(prefix, root, suffix)</code> with frequency-weighted selection; roots from a concise list (e.g., <em>river, thunder, sound, queen, tree, night</em>).</li>
+    <li><strong>Added tokens:</strong> <strong>447</strong> new types (synthetic + lexicon candidates).</li>
+    <li><strong>Tokenizer final size:</strong> <strong>33,098</strong>; <strong>max length:</strong> <strong>2,048</strong>.</li>
+  </ul>
+
+  <h2>3) Embedding Initialisation</h2>
+  <ul>
+    <li><strong>No mean resizing:</strong> <code>resize_token_embeddings(..., mean_resizing=False)</code> for explicit control.</li>
+    <li><strong>Composition rule:</strong> \(E(w) = lpha E(	ext{prefix}) + (1 - 2lpha) E(	ext{root}) + lpha E(	ext{suffix}) + arepsilon\)\, with small Gaussian noise.</li>
+    <li><strong>Morpheme not single-token:</strong> approximate via <strong>mean of example words</strong>.</li>
+    <li><strong>OOV root:</strong> small random vector scaled to pre-init embedding std.</li>
+    <li><strong>Head tie:</strong> <code>model.lm_head.weight = model.get_input_embeddings().weight</code>.</li>
+  </ul>
+
+  <h2>4) Training Protocol</h2>
+  <h3>Phase 1 — Embedding-only warm-up</h3>
+  <ul>
+    <li>Freeze all but input embeddings + LM head; <strong>Adafactor</strong>.</li>
+    <li><code>epochs=1</code>, <code>lr=5e-4</code>, <code>per_device_train_batch_size=8</code>, <code>gradient_accumulation_steps=2</code>, <code>save_steps=200</code>.</li>
+    <li><code>use_cache=False</code>, no fp16/bf16, gradient checkpointing off.</li>
+  </ul>
+  <h3>Phase 2 — Full-model fine-tune</h3>
+  <ul>
+    <li>Unfreeze all; <strong>8-bit Adam</strong> (if available) or Adafactor.</li>
+    <li><code>epochs=2</code>, <code>lr=2e-5</code>, <code>warmup_ratio=0.10</code>, <code>per_device_train_batch_size=8</code>, <code>gradient_accumulation_steps=2</code>, <code>weight_decay=0.01</code>, <code>save_steps=200</code>.</li>
+    <li>Early stopping patience=2 if validation present; gradient checkpointing on; <code>fp16=False</code>.</li>
+    <li><strong>Dataset split (successful run):</strong> train <strong>1,566</strong> blocks; valid <strong>174</strong> blocks.</li>
+  </ul>
+
+  <h2>5) Results and Diagnostics</h2>
+  <table class="kv">
+    <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+    <tbody>
+      <tr><td>New tokens added</td><td><strong>447</strong></td></tr>
+      <tr><td>Compared synthetic tokens</td><td><strong>49</strong></td></tr>
+      <tr><td>Mean top-5 neighbor overlap (pre→post)</td><td><strong>≈ 3.7 / 5</strong></td></tr>
+      <tr><td>Mean embedding norm change</td><td><strong>≈ 0.0051</strong></td></tr>
+      <tr><td>Tokenization check</td><td>Many synthetic words now <strong>single IDs</strong></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Qualitative neighbors (examples)</h3>
+  <ul>
+    <li><code>presounder</code> → among <code>presounded, ensounder, resound, soundy</code></li>
+    <li><code>consongen</code> → among <code>consonger, songer, songy</code></li>
+    <li><code>destarment</code> → among <code>destar, destares, destaring</code></li>
+  </ul>
+
+  <h3>Figures (expected relative paths in repo)</h3>
+  <div class="grid">
+    <div class="figure">
+      <img src="runs/phase2/plots/hist_overlap_top5.png" alt="Histogram of top-5 neighbor overlap">
+      <div class="caption">Figure 1 — Histogram of top-5 neighbor overlap for new tokens.</div>
+    </div>
+    <div class="figure">
+      <img src="runs/phase2/plots/hist_norm_change.png" alt="Histogram of embedding norm change">
+      <div class="caption">Figure 2 — Distribution of embedding norm change.</div>
+    </div>
+    <div class="figure">
+      <img src="runs/phase2/plots/scatter_norm_vs_overlap.png" alt="Scatter: norm change vs. overlap">
+      <div class="caption">Figure 3 — Scatter of norm change vs top-5 overlap.</div>
+    </div>
+    <div class="figure">
+      <img src="runs/phase2/plots/tsne_newtokens_vs_precentroids.png" alt="t-SNE: new tokens vs pre-training centroids">
+      <div class="caption">Figure 4 — t‑SNE: new tokens positioned vs pre-training neighbor centroids.</div>
+    </div>
+  </div>
+
+  <h3>Saved artifacts</h3>
+  <ul class="small">
+    <li>JSON: <code>pre_morpheme_snapshot.json</code>, <code>post_morpheme_snapshot.json</code>, <code>morpheme_comparison.json</code>, <code>summary_stats.json</code>, <code>tokenizer_config.json</code></li>
+    <li>PNG: <code>hist_overlap_top5.png</code>, <code>hist_norm_change.png</code>, <code>scatter_norm_vs_overlap.png</code>, <code>tsne_newtokens_vs_precentroids.png</code></li>
+    <li>Notebook: <code>notebooks/Wake2Vec_three_cell.ipynb</code></li>
+  </ul>
+
+  <h2>6) Minimal Repro (Notebook)</h2>
+  <p>A compact three-cell notebook runs end-to-end: (1) setup + data ingest; (2) tokenizer expansion + morpheme-composed init (with <code>mean_resizing=False</code> and head tie); (3) two-phase training + quick neighbor probe.</p>
+
+  <h2>7) Limitations</h2>
+  <ul>
+    <li>Current neighbor analysis focuses on top-k overlap and norm deltas; isotropy and pairwise cosine distributions are planned.</li>
+    <li>Validation perplexity is optional and not included in all runs.</li>
+    <li>Synthetic roots are intentionally narrow; broader coverage may alter drift dynamics.</li>
+  </ul>
+
+  <h2>8) Next Steps</h2>
+  <ol>
+    <li>Extend Phase 2 (slightly lower LR, same warm-up) with early stopping.</li>
+    <li>Add held-out perplexity on a Wake slice and a blind generation read.</li>
+    <li>Ablation: random-init vs composition to quantify morphology-aware gains.</li>
+    <li>Track isotropy, pairwise cosine distributions, and top-k stability across seeds.</li>
+  </ol>
+
+  <hr class="hr">
+  <h3>Appendix A — Reproduction Checklist</h3>
+  <ul class="small">
+    <li>✅ <code>resize_token_embeddings(..., mean_resizing=False)</code></li>
+    <li>✅ Re-tie <code>lm_head</code> to input embeddings after resizing</li>
+    <li>✅ <code>model.config.use_cache=False</code> during training</li>
+    <li>✅ If OOM on T4: 8-bit Adam or Adafactor; reduce batch; increase grad accumulation; keep <code>fp16=False</code></li>
+    <li>✅ Align <code>save_strategy</code> and <code>evaluation_strategy</code> when <code>load_best_model_at_end=True</code></li>
+  </ul>
+
+  <p class="muted small">Note: Figures load if the expected file structure exists in your repo. To freeze figures for sharing, export this page to PDF from your browser (Print → Save as PDF).</p>
+</div>
+</body>
+</html>
