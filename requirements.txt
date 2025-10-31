@@ -1,8 +1,25 @@
+# Core
+torch            # use Colab preinstalled CUDA build
 transformers>=4.43
-peft>=0.11
+accelerate>=0.33
 datasets
+tokenizers>=0.15
+safetensors
+
+# Finetuning / PEFT (optional but used in repo)
+peft>=0.11
+bitsandbytes>=0.43; platform_system!="Windows"    # 8-bit Adam (skip on Windows)
+
+# Metrics / analysis / viz
+scikit-learn
 umap-learn
 faiss-cpu
 wordfreq
-unidecode
+Unidecode
 matplotlib
+numpy
+pandas
+
+# Optional quality-of-life
+tqdm
+evaluate
