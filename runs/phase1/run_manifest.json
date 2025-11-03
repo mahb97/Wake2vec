@@ -1,0 +1,13 @@
+{
+  "run_id": "t4_1762205939",
+  "base": "TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T",
+  "started": 1762205949.6470864,
+  "max_steps": 1100,
+  "grad_accum": 16,
+  "optim": "adafactor",
+  "eval_mode": "callback",
+  "eval_steps": 200,
+  "valid_shard": 48,
+  "block_size": 448,
+  "fw_text_used": true
+}
