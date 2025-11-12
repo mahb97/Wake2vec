@@ -284,6 +284,86 @@ Each notebook is designed to be run independently or as part of the full pipelin
 
 ---
 
+## Heartbeat Monitoring System
+
+For long-running training experiments on preemptible compute instances, the repository includes a dedicated monitoring notebook that provides non-invasive inspection of training progress without interfering with active processes.
+
+### Monitoring Capabilities
+
+The heartbeat system tracks:
+
+- Training loss trajectory from JSON logs and trainer state files
+- Evaluation metrics at configurable step intervals
+- Checkpoint inventory across local ephemeral and persistent storage
+- Embedding snapshot presence and modification times
+- Age reporting for all artifacts in human-readable format
+
+### Storage Hierarchy
+
+The monitoring system inspects three storage locations:
+
+- **Local ephemeral**: `/content/runs/t4_*` (active training directory)
+- **Drive persistent**: `/content/drive/MyDrive/wake2vec/runs/t4_*` (synchronized copy)
+- **Sentry backup**: `/content/drive/MyDrive/wake2vec/sentry_backups/t4_*` (safety mirror)
+
+### Checkpoint Validation
+
+Checkpoints are verified by checking for valid weight files (`model.safetensors`, `pytorch_model.bin`, or sharded variants). The system automatically identifies the most recent valid checkpoint suitable for resumption, excluding incomplete or corrupted saves.
+
+### Usage
+
+The monitoring notebook is designed for manual execution at user-defined intervals. Typical usage patterns include hourly checks during active training, post-checkpoint verification after save events, and pre-resume validation before launching continuation runs.
+
+---
+
+## Llama Trials
+
+The `Llama/` directory contains experimental work extending Wake2Vec to larger language models, specifically Meta's Llama 3.1 8B and Llama 3.2 3B architectures.
+
+### Motivation
+
+While the primary Wake2Vec pipeline targets TinyLlama (1.1B parameters) for compute efficiency and rapid iteration, the Llama trials investigate whether the morpheme-aware embedding injection methodology scales to models with substantially larger capacity and more sophisticated language understanding.
+
+### Technical Challenges
+
+Adapting Wake2Vec to Llama models introduced several technical constraints:
+
+**Memory limitations**: Llama 3.1 8B requires quantization (4-bit via bitsandbytes) to fit on Colab T4 GPUs (15GB VRAM). Even with quantization, some configurations required CPU offloading or switching to the smaller Llama 3.2 3B variant.
+
+**Gated model access**: Llama models require explicit approval from Meta via Hugging Face, introducing delays in experimentation cycles.
+
+**Library compatibility**: Triton and bitsandbytes version conflicts required careful dependency management. The working configuration uses `torch==2.5.1`, `triton==3.1.0`, `bitsandbytes==0.43.3`.
+
+**Repulsion loss memory**: With approximately 44,000 new Wake tokens, computing pairwise similarity matrices for isotropy regularization caused out-of-memory errors. This was mitigated by sampling 1,000 random token pairs or disabling repulsion entirely.
+
+### Training Configuration
+
+Llama trials use modified hyperparameters to accommodate the larger model:
+
+- **Quantization**: 4-bit NF4 with double quantization
+- **Sequence length**: 1024 (reduced from 2048 due to memory)
+- **Batch size**: 1 with gradient accumulation of 8-16 steps
+- **Learning rate**: 8e-4 (embedding phase), 2e-5 (full fine-tune)
+- **Optimizer**: Adafactor (memory efficient)
+- **PEFT adapter**: Minimal LoRA (r=1 on q_proj) to satisfy quantized training requirements
+
+### Current Status
+
+The Llama trials remain experimental. Initial embedding-only training phases showed stable loss reduction, but full evaluation metrics (geometry analysis, perplexity, generation quality) are pending completion of multi-day training runs on available compute.
+
+### Reproducibility Notes
+
+To replicate Llama experiments:
+
+1. Request access to Llama models at https://huggingface.co/meta-llama
+2. Install compatible dependencies: `pip install torch==2.5.1 triton==3.1.0 bitsandbytes==0.43.3`
+3. Use notebooks in `Llama/` directory with T4 or better GPU
+4. Expect training times of 12-24 hours for embedding phase on T4
+
+The Llama trials demonstrate that Wake2Vec's compositional embedding methodology is architecturally agnostic, though practical deployment on larger models requires careful memory management and extended compute budgets.
+
+---
+
 ## Citation and Credit
 
 - **Text**: James Joyce, *Finnegans Wake*
@@ -292,7 +372,3 @@ Each notebook is designed to be run independently or as part of the full pipelin
 
 **Cite**: https://github.com/mahb97/Wake2vec/blob/21469d75c26d40988ec5af8a4358d1796a36fdf0/data/CITATION.cff
 
----
-
-**License**: [Add your license here]  
-**Contact**: [Add your contact/GitHub info here]
