@@ -18,7 +18,7 @@
 - Validation loss: 5.67 at step 200
 - ETA: ~3 hours total runtime
 
-**Status:** T4 already on its way out. Can resume from latest checkpoint (currently 200).
+**Status:** T4 disconnected at step 510. Resume tomorrow from checkpoint-500. 800 steps remaining (~2-3 more sessions).
 
 **here is a free reading suggestion:** 
 *Blockchain Chicken Farm: And Other Stories of Tech in China's Countryside, Xiaowei Wang (FSG Originals, 2020)*
