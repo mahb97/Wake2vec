@@ -46,74 +46,91 @@ average embeddings of high-quality example words if a morpheme isn't single-toke
 
 ---
 
-## Training Protocols
+## Two-Phase Protocol (Standard)
 
-Wake2Vec supports two training approaches depending on your compute budget and goals:
-
-### Two-Phase Protocol (Standard)
-
-**Phase 1: Embedding-only warm-up**  
+### Phase 1: Embedding-only warm-up
 Freeze everything except `input_embeddings` (+ tied head). Train on synthetic sentences + Wake blocks with Adafactor.
 
 **Typical hyperparameters:**
-- Epochs: 1
-- Learning rate: 5e-4
-- Batch size: 8
-- Gradient accumulation: 2
-- Warmup ratio: 0.0
-- Save steps: 200
-- `use_cache=False`
-- No fp16 on T4
+* max_steps: 1300
+* Learning rate: 5e-4
+* Batch size: 1
+* Gradient accumulation: 16
+* Warmup ratio: 0.05
+* Save steps: 100
+* `use_cache=False`
+* No fp16 on T4
 
-**Phase 2: Full model fine-tune**  
-Unfreeze all parameters. Fine-tune on *Finnegans Wake* with conservative schedules, early stopping on validation loss, and pinned software versions.
-
-**Typical hyperparameters:**
-- Epochs: 2
-- Learning rate: 2e-5
-- Warmup ratio: 0.10
-- Batch size: 8
-- Gradient accumulation: 2
-- Weight decay: 0.01
-- Save steps: 200
-- Early stopping with patience: 2
-- Gradient checkpointing enabled
-- No fp16 on T4
-
-### Three-Phase Protocol (Experimental)
-
-**Phase 1: Embeddings-only warm-up**  
-Same as two-phase protocol above, but with longer training:
-- `max_steps ≈ 800–2000`
-- `lr = 5e-4`
-- `grad_accum = 16`
-- `batch_size = 1`
-
-**Phase 2: LoRA behaviour tune**  
-Attach LoRA to attention/MLP, keep embeddings frozen. Train on real Wake blocks.
+### Phase 2: Full model fine-tune
+Unfreeze all parameters. Fine-tune on Finnegans Wake with conservative schedules, early stopping on validation loss, and pinned software versions.
 
 **Typical hyperparameters:**
-- Epochs: 1
-- `lr = 2e-5`
-- Warmup: 0.10
-- `grad_accum = 16`
-- `batch_size = 1`
-- 8-bit Adam if available
+* Epochs: 2
+* Learning rate: 2e-5
+* Warmup ratio: 0.10
+* Batch size: 8
+* Gradient accumulation: 2
+* Weight decay: 0.01
+* Save steps: 200
+* Early stopping with patience: 2
+* Gradient checkpointing enabled
+* No fp16 on T4
 
-**Phase 3: Embed-alignment++**  
-Unfreeze embeddings (+ tied head) and add new-row-only regularisers on top of LM loss:
+---
 
-- **L_anchor** = ‖E_new − E_comp‖² (stay near composition)
-- **L_centroid** = 1 − cos(E_new, centroid_pre) (stay near pre-neighbour centroid)
-- **L_norm** = (‖E_new‖ − ‖E_pre‖)² (norm hygiene)
+## Three-Phase Protocol (Morpheme-Aware)
+
+### Phase 1: Embeddings-only warm-up
+Same as two-phase protocol, establishing baseline Wake token embeddings.
+
+**Hyperparameters:**
+* max_steps: 1300
+* lr: 5e-4
+* Warmup ratio: 0.05
+* grad_accum: 16
+* batch_size: 1
+* Sequence length: 256 tokens
+
+### Phase 2: LoRA behavioral tuning
+Attach LoRA adapters to attention/MLP layers while keeping embeddings frozen. Train on Wake corpus to adapt model behavior without disturbing embedding space.
 
 **Typical hyperparameters:**
-- `max_steps = 400–800`
-- `lr = 5e-5`
-- Warmup: 0.10
-- Adafactor
-- Gradients masked to new rows only
+* Epochs: 1-2
+* lr: 2e-5
+* Warmup: 0.10
+* grad_accum: 16
+* batch_size: 1
+* LoRA rank: 8-16
+* Target modules: q_proj, v_proj, mlp layers
 
+### Phase 3: Morpheme-compositional alignment
+Unfreeze embeddings with morpheme-aware regularization. Uses decomposition data (prefixes/suffixes) to enforce compositional semantics in new token embeddings.
+
+**Loss components:**
+* L_lm: Standard language modeling loss
+* L_morpheme: Compositional constraint forcing Wake tokens toward component averages
+  - Example: `E["allbust"] ≈ mean(E["all"], E["bust"])`
+* L_repulsion: Adversarial term preventing Wake token collapse
+* L_norm: Norm hygiene keeping Wake embeddings in distribution
+
+**Typical hyperparameters:**
+* max_steps: 400-800
+* lr: 5e-5
+* Warmup: 0.10
+* Optimizer: Adafactor
+* Gradient masking: New tokens only
+* Loss weights: λ_morpheme=0.1, λ_repulsion=0.05, λ_norm=0.01
+
+**Data requirements:**
+* Morpheme decomposition mapping (JSON format)
+* Prefix/suffix inventory with examples
+* Component token validation in base vocabulary
+
+**Expected outcomes:**
+* Morphologically related tokens cluster in embedding space
+* K-nearest neighbors reflect compositional structure
+* Embedding norms remain stable relative to base vocabulary
+* Isotropy preserved in extended vocabulary subspace
 ---
 
 ## Data and Setup
