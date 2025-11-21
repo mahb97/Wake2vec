@@ -39,7 +39,24 @@
 - Resumed successfully from checkpoint-500 using checkpoint-0 tokenizer
 - Optimizer state loaded correctly (~5GB overhead from resume)
 - Step timer consistent at 9.3s/step
-- Bo (cat) contributed to debugging process
+
+| Step | Training Loss | Validation Loss |
+|------|---------------|-----------------|
+| 550  | 1.078500      | -               |
+| 600  | 0.999900      | 6.330507        |
+| 650  | 0.844600      | -               |
+| 700  | 0.718500      | -               |
+| 750  | 0.601200      | -               |
+| 800  | 0.496100      | 6.636135        |
+| 850  | 0.397600      | -               |
+| 900  | 0.326600      | -               |
+| 950  | 0.265200      | -               |
+| 1000 | 0.216000      | 6.827282        |
+| 1050 | 0.172000      | -               |
+| 1100 | 0.134000      | -               |
+
+**Loss reduction:** 87.6% (1.08 → 0.134) over 550 steps
+**Overall reduction from start:** 98.4% (8.46 → 0.134) over 1100 steps
 
 ### Status
 
