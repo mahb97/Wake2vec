@@ -172,40 +172,45 @@ Unfreeze embeddings with morpheme-aware regularization. Uses decomposition data 
 
 ---
 
-## Results from the Latest Run
+# Wake2Vec P2 Findings: Validation Gap Discovery
 
-This run evaluates a subset of 49 synthetic morphemic tokens with pre and post snapshots using the two-phase protocol.
+**Date:** 2025-11-28  
+**Model:** TinyLlama-1.1B  
+**Phase:** P2 (aborted at step 800)
 
-### Geometry and Stability
+---
 
-- **Mean neighbour overlap (top-5)**: 3.7 of 5
-- **Mean embedding norm change**: 0.0051
+## Summary
 
-**Interpretation**: Neighbourhoods remain coherent; the vectors move slightly toward Wake-like regions without collapse or uncontrolled drift.
+P2 training revealed that P1's reported loss (~0.08) was artificially low due to train-only evaluation. Introducing a held-out validation set exposed a significant generalization gap.
 
-### Representative Examples
+---
 
-- **conmanes** — overlap 4 of 5, neighbours: manes, conmaning, enmanes, comanes
-- **presounder** — overlap 4 of 5, neighbours: presounded, ensounder, resound, soundy
-- **soundity** — overlap 3 of 5, shows modest drift yet remains in the sound cluster
+## P1 Recap (No Val)
 
-### Visual Diagnostics
+- Trained embeddings only on full corpus
+- No held-out set; metrics reflected memorization
 
-- t-SNE shows the new tokens clustered near centroids of their pre-training neighbour sets
-- Histograms for neighbour overlap and norm change show a stable centre with light positive shift
-- Scatter of norm change versus overlap highlights a small tail of tokens to inspect manually
+## P2 Results (With Validation)
 
-See `results/wake2vec_report.html` for the full static report with figures and tables.
+| Step | Train Loss | Val Loss |
+|------|------------|----------|
+| 50   | 4.50       | -        |
+| 200  | 4.46       | 4.81     |
+| 400  | 4.45       | 4.81     |
+| 600  | 4.39       | 4.82     |
+| 800  | 4.29       | 4.82     |
 
-### Three-Phase Results (When Available)
+Early stopping triggered after step 800 (patience=2, no val improvement).
 
-**Phase 1 loss (example first 200 steps):** 6.34 → 4.28 (steady decline)
+## Diagnosis
 
-**Geometry targets:**
-- **P1:** *composed-init → post-P1* mean overlap@5 ≈ 2.5–3.5
-- **P3:** *post-P2 → post-P3* mean overlap@5 shifts with small +Δ‖E‖ (≈ 0.01–0.08)
+- Train loss decreasing, val loss flat → classic overfit signal
+- P2 starting at 4.5 (not 7+) confirms P1 embeddings loaded correctly
+- Val loss ~4.8 represents true generalization performance on unseen Wake text
+- The train/val gap existed in P1 but was invisible without a held-out set
 
-> **Note:** After a three-phase run, update this section with actual P1/P3 overlaps, Δ‖E‖, perplexity, and qualitative neighbour examples.
+Going to have to re-run P1 with 90/10 train/val split to establish honest baseline metrics.
 
 ---
 
@@ -345,39 +350,46 @@ While the primary Wake2Vec pipeline targets TinyLlama (1.1B parameters) for comp
 
 Adapting Wake2Vec to Llama models introduced several technical constraints:
 
-**Memory limitations**: Llama 3.1 8B requires quantization (4-bit via bitsandbytes) to fit on Colab T4 GPUs (15GB VRAM). Even with quantization, some configurations required CPU offloading or switching to the smaller Llama 3.2 3B variant.
+**Memory limitations**: Llama-3.2-1B requires 4-bit quantization via bitsandbytes to fit on Colab T4 GPUs (15GB VRAM). The working configuration uses NF4 quantization with double quantization enabled, allocating 13GB to GPU and 30GB to CPU offload.
 
-**Gated model access**: Llama models require explicit approval from Meta via Hugging Face, introducing delays in experimentation cycles.
+**Gated model access**: Llama models require explicit approval from Meta via Hugging Face, introducing authentication steps in training pipelines.
 
-**Library compatibility**: Triton and bitsandbytes version conflicts required careful dependency management. The working configuration uses `torch==2.5.1`, `triton==3.1.0`, `bitsandbytes==0.43.3`.
+**Library compatibility (Nov 2025 Colab)**: Default Colab environment (torch 2.8.0, CUDA 12.9) conflicts with bitsandbytes and triton. The working configuration requires explicit downgrade: `torch==2.5.1+cu121`, `triton==3.1.0`, `bitsandbytes==0.43.3`, `transformers==4.45.2`, `accelerate==0.34.2`, `peft==0.13.2`. Runtime restart required after installation.
 
-**Repulsion loss memory**: With approximately 44,000 new Wake tokens, computing pairwise similarity matrices for isotropy regularization caused out-of-memory errors. This was mitigated by sampling 1,000 random token pairs or disabling repulsion entirely.
+**Gradient checkpointing incompatibility**: 4-bit quantized models with LoRA adapters cannot use gradient checkpointing due to interaction between quantization and activation recomputation. This limits batch size options.
 
 ### Training Configuration
 
-Llama trials use modified hyperparameters to accommodate the larger model:
+Llama-3.2-1B trials use the following configuration:
 
 - **Quantization**: 4-bit NF4 with double quantization
-- **Sequence length**: 1024 (reduced from 2048 due to memory)
-- **Batch size**: 1 with gradient accumulation of 8-16 steps
-- **Learning rate**: 8e-4 (embedding phase), 2e-5 (full fine-tune)
-- **Optimizer**: Adafactor (memory efficient)
-- **PEFT adapter**: Minimal LoRA (r=1 on q_proj) to satisfy quantized training requirements
+- **Sequence length**: 256 tokens
+- **Batch size**: 8 with gradient accumulation of 2 (effective batch: 16)
+- **Learning rate**: 2e-5 (LoRA fine-tune phase)
+- **Scheduler**: Cosine with 10% warmup
+- **PEFT adapter**: LoRA r=8 on q_proj, v_proj, gate_proj, up_proj, down_proj
+- **Regularization**: Weight decay 0.01, max grad norm 1.0, dropout 0.1
 
 ### Current Status
 
-The Llama trials remain experimental. Initial embedding-only training phases showed stable loss reduction, but full evaluation metrics (geometry analysis, perplexity, generation quality) are pending completion of multi-day training runs on available compute.
-
+Initial P1 (embeddings-only) training on TinyLlama-1.1B achieved train loss 8.4 → 0.08 over 1300 steps. However, P2 trials with a held-out validation set revealed this reflected memorization rather than generalization—validation loss remained flat at ~4.8 while train loss continued to decrease.
 ### Reproducibility Notes
 
 To replicate Llama experiments:
 
 1. Request access to Llama models at https://huggingface.co/meta-llama
-2. Install compatible dependencies: `pip install torch==2.5.1 triton==3.1.0 bitsandbytes==0.43.3`
-3. Use notebooks in `Llama/` directory with T4 or better GPU
-4. Expect training times of 12-24 hours for embedding phase on T4
+2. Uninstall default Colab packages and install compatible dependencies:
+   ```bash
+   pip uninstall -y torch torchvision torchaudio triton bitsandbytes transformers accelerate peft jax jaxlib flax
+   pip install torch==2.5.1+cu121 torchvision==0.20.1+cu121 torchaudio==2.5.1+cu121 --index-url https://download.pytorch.org/whl/cu121
+   pip install triton==3.1.0 bitsandbytes==0.43.3 transformers==4.45.2 accelerate==0.34.2 peft==0.13.2 scikit-learn
+   ```
+3. Restart runtime after installation
+4. Use notebooks in `Llama/` directory with T4 or better GPU
+5. Mount Google Drive for checkpoint persistence (T4 sessions are unstable)
+6. Expect training times of 3-5 hours for P1 embedding phase, 2-3 hours for P2 LoRA fine-tune
 
-The Llama trials demonstrate that Wake2Vec's compositional embedding methodology is architecturally agnostic, though practical deployment on larger models requires careful memory management and extended compute budgets.
+The Llama trials demonstrate that Wake2Vec's compositional embedding methodology is architecturally agnostic, though practical deployment requires careful memory management via quantization and robust checkpointing to handle Colab disconnections.
 
 ---
 
