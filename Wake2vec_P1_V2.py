@@ -196,8 +196,7 @@ trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print(f"Tied embeddings: {emb.weight.data_ptr() == model.get_output_embeddings().weight.data_ptr()}")
 print(f"Trainable params: {trainable:,}")
 
-
-# Callbacks
+# callbacks
 from transformers import TrainingArguments, Trainer, TrainerCallback
 
 def has_weights(ck):
@@ -227,15 +226,12 @@ class FullCheckpoint(TrainerCallback):
                 shutil.rmtree(full_ck)
             full_ck.mkdir(parents=True, exist_ok=True)
 
-            # Save model
             model.save_pretrained(full_ck)
             tok.save_pretrained(full_ck)
 
-            # Save embeddings explicitly
             E = model.get_input_embeddings().weight.detach().cpu()
             torch.save(E, full_ck / "embeddings.pt")
 
-            # Save training state
             torch.save({
                 'global_step': step,
                 'best_metric': state.best_metric,
@@ -270,22 +266,7 @@ class SentryMirror(TrainerCallback):
         except Exception as e:
             print(f"[SENTRY] {e}")
 
-class StepTimer(TrainerCallback):
-    """Log timing every 100 steps."""
-    def __init__(self):
-        self.step_times = []
-        self.last_time = None
-
-    def on_step_end(self, args, state, control, **kw):
-        now = time.time()
-        if self.last_time is not None:
-            self.step_times.append(now - self.last_time)
-            if state.global_step % 100 == 0 and self.step_times:
-                avg = sum(self.step_times[-100:]) / len(self.step_times[-100:])
-                print(f"[TIME] Step {state.global_step}: {avg:.1f}s/step avg")
-        self.last_time = now
-
-# Trainer
+# trainer 
 args = TrainingArguments(
     output_dir=str(LOCAL_RUN),
     per_device_train_batch_size=BATCH_SIZE,
@@ -320,17 +301,12 @@ trainer = Trainer(
         EmbeddingSnapshot(),
         FullCheckpoint(),
         SentryMirror(),
-        StepTimer(),
     ],
 )
 
-print("=" * 60)
-print("SAVE CONFIGURATION")
-print("=" * 60)
-print(f"Embedding snapshots -> {EMB_SNAPS} (every 50 steps)")
-print(f"Full checkpoints   -> {FULL_CHECKPOINTS} (every {SAVE_STEPS} steps)")
-print(f"Sentry backups     -> {SENTRY} (every {SAVE_STEPS} steps)")
-print("=" * 60)
+print(f"Embedding snapshots: {EMB_SNAPS} (every 50 steps)")
+print(f"Full checkpoints: {FULL_CHECKPOINTS} (every {SAVE_STEPS} steps)")
+print(f"Sentry backups: {SENTRY} (every {SAVE_STEPS} steps)")
 
 # train
 print("=" * 80)
