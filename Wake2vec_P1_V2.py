@@ -52,6 +52,7 @@ LOCAL_RUN = Path("/content/runs/wake2vecP1_v2")
 SENTRY = WAKE2VEC_ROOT / "sentry_backups"
 EMB_SNAPS = WAKE2VEC_ROOT / "emb_snaps"
 FULL_CHECKPOINTS = WAKE2VEC_ROOT / "full_checkpoints"
+RESUME_FROM = SENTRY / "checkpoint-600"
 
 for d in [WAKE2VEC_ROOT, LOCAL_RUN, SENTRY, EMB_SNAPS, FULL_CHECKPOINTS]:
     d.mkdir(parents=True, exist_ok=True)
@@ -318,7 +319,7 @@ print(f"Trainable: {trainable:,} params")
 print("=" * 80)
 
 t0 = time.time()
-trainer.train()
+trainer.train(resume_from_checkpoint=str(RESUME_FROM))
 elapsed = (time.time() - t0) / 60
 
 print("=" * 80)
