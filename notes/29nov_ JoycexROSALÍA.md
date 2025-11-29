@@ -44,3 +44,13 @@ So far: gentle improvement in val, heavier drop in train; the planned P1a/P1b/P1
 Joyce x ROSALÍA: it's like proven that embeddings fry better with...  
 - [LA YUGULAR – ROSALÍA](https://soundcloud.com/rosaliaofficial/la-yugular?in=houseof_kyri/sets/quantum-leaped)  
 - [RELIQUIA – ROSALÍA](https://soundcloud.com/rosaliaofficial/reliquia?in=rosaliaofficial/sets/lux-226901126)
+
+When Colab dont wanna collab : TinyLlama P1 v2 (T4) session cut out around step ~700.
+
+Saved:
+- [SENTRY] checkpoint-600 
+- [EMB] snapshots at steps 650 and 700
+
+Status:
+- P1a/P1b covered (train ↓, val drifting 11.20 → 10.96…)
+- P1c (meltdown, ≥800) tbc.
