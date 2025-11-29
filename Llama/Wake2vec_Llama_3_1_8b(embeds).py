@@ -78,6 +78,8 @@ FULL_CHECKPOINTS = RUN_DIR / "full_checkpoints"
 for d in [RUN_DIR, LOCAL_RUN, SENTRY, EMB_SNAPS, FULL_CHECKPOINTS]:
     d.mkdir(parents=True, exist_ok=True)
 
+RESUME_FROM = SENTRY / "checkpoint-200" if SENTRY.exists() else None
+
 # Training hyperparameters
 SEQ_LEN = 512
 STRIDE = 512
@@ -383,7 +385,7 @@ print(f"Full checkpoints: {FULL_CHECKPOINTS}")
 print(f"Sentry backups: {SENTRY}")
 print("=" * 60)
 
-trainer.train()
+trainer.train(resume_from_checkpoint=str(RESUME_FROM))
 
 print("=" * 60)
 print("TRAINING COMPLETE")
