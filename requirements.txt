@@ -7,12 +7,16 @@ tokenizers>=0.15
 safetensors
 scikit-learn
 
-# Quantization & 8-bit optimizers (optional, mainly for LLaMA; Linux-only)
-bitsandbytes==0.43.3; platform_system=="Linux"
-triton==3.1.0; platform_system=="Linux"
+# Quantization (optional, for Llama)
+bitsandbytes==0.43.3
+triton==3.1.0
 
-# PEFT / LoRA (P2+, LLaMA + TinyLlama)
+# PEFT (optional, for P2 LoRA)
 peft==0.13.2
+
+# Finetuning / PEFT (optional but used in repo)
+peft>=0.11
+bitsandbytes>=0.43; platform_system!="Windows"
 
 # Metrics / analysis / viz
 scikit-learn
