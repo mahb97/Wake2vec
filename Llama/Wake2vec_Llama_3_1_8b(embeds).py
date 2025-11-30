@@ -49,7 +49,6 @@ from transformers import (
 from peft import LoraConfig, get_peft_model
 
 # Drive and HF Authenticate
-
 from google.colab import drive
 drive.mount('/content/drive')
 
@@ -78,7 +77,7 @@ FULL_CHECKPOINTS = RUN_DIR / "full_checkpoints"
 for d in [RUN_DIR, LOCAL_RUN, SENTRY, EMB_SNAPS, FULL_CHECKPOINTS]:
     d.mkdir(parents=True, exist_ok=True)
 
-RESUME_FROM = SENTRY / "checkpoint-200" if SENTRY.exists() else None
+RESUME_FROM = SENTRY / "checkpoint-300" if SENTRY.exists() else None
 
 # Training hyperparameters
 SEQ_LEN = 512
@@ -104,7 +103,6 @@ print(f"Embedding snapshots: {EMB_SNAP_STEPS} steps")
 print("=" * 60)
 
 # GPU Verification
-
 torch.cuda.empty_cache()
 gc.collect()
 
@@ -114,7 +112,6 @@ print(f"  Total memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:
 print(f"  Allocated: {torch.cuda.memory_allocated(0) / 1e9:.2f} GB")
 
 # Model with 4-bit Quantization
-
 bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
     bnb_4bit_use_double_quant=True,
@@ -164,7 +161,6 @@ for n, p in model.named_parameters():
     p.requires_grad = False
 
 # Wake vocab Extension
-
 def read_lines(path):
     if not os.path.exists(path):
         return []
@@ -222,7 +218,6 @@ trainable = num_added * wte.weight.shape[1] if num_added > 0 else 0
 print(f"Trainable parameters: {trainable:,} (Wake embeddings only)")
 
 # Dataset
-
 class BlockDataset(Dataset):
     """Fixed-length block dataset for language modeling."""
     
@@ -254,7 +249,6 @@ train_ds = BlockDataset(CORPUS_TXT, tok, SEQ_LEN, STRIDE)
 print(f"Dataset: {len(train_ds)} blocks, {SEQ_LEN} tokens each")
 
 # callbacks
-
 class EmbeddingSnapshot(TrainerCallback):
     """Save embedding weights at regular intervals."""
     
@@ -321,7 +315,6 @@ class SentryMirror(TrainerCallback):
             print(f"[SENTRY] {e}")
 
 # Trainer
-
 class EmbeddingOnlyTrainer(Trainer):
     """Trainer configured for embedding-only optimization."""
     
@@ -343,7 +336,6 @@ class EmbeddingOnlyTrainer(Trainer):
         return (loss, out) if return_outputs else loss
 
 # training args
-
 args = TrainingArguments(
     output_dir=str(LOCAL_RUN),
     per_device_train_batch_size=1,
@@ -374,7 +366,6 @@ trainer = EmbeddingOnlyTrainer(
 )
 
 # Train
-
 print("=" * 60)
 print("WAKE2VEC LLAMA P1: EMBEDDING FINE-TUNING")
 print("=" * 60)
@@ -404,7 +395,6 @@ os.sync()
 print(f"Final artifacts saved to {final_dir}")
 
 # eval 
-
 import matplotlib.pyplot as plt
 import numpy as np
 
