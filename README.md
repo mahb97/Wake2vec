@@ -172,45 +172,36 @@ Unfreeze embeddings with morpheme-aware regularization. Uses decomposition data 
 
 ---
 
-# Wake2Vec P2 Findings: Validation Gap Discovery
-
-**Date:** 2025-11-28  
-**Model:** TinyLlama-1.1B  
-**Phase:** P2 (aborted at step 800)
-
----
+# Wake2Vec P2 Pilot: Validation Gap
 
 ## Summary
 
-P2 training revealed that P1's reported loss (~0.08) was artificially low due to train-only evaluation. Introducing a held-out validation set exposed a significant generalization gap.
+the validation gap measures how much Wake is bending the model.
 
 ---
 
-## P1 Recap (No Val)
+## P1 Recap (No Validation)
 
-- Trained embeddings only on full corpus
-- No held-out set; metrics reflected memorization
+- Embeddings-only training on the full corpus
+- No held-out set; metrics reported only on the training blocks
+- Apparent near-zero loss was actually memorisation of Wake slices
 
-## P2 Results (With Validation)
+---
 
-| Step | Train Loss | Val Loss |
-|------|------------|----------|
-| 50   | 4.50       | -        |
-| 200  | 4.46       | 4.81     |
-| 400  | 4.45       | 4.81     |
-| 600  | 4.39       | 4.82     |
-| 800  | 4.29       | 4.82     |
+## Interpretation
 
-Early stopping triggered after step 800 (patience=2, no val improvement).
+- Train ↓, Val ↔ is a classic overfit signature, but here it also confirms that:
+  - P1 embeddings were correctly loaded (P2 starts around 4.5, not 7+),
+  - Wake is small/weird enough that the model can memorise it quickly.
+- A validation loss of ~4.8 is a more honest measure of generalisation to unseen Wake text.
+- The train/val gap that already existed in P1 simply wasn’t visible without a held-out set.
 
-## Diagnosis
+Rather than “fixing” this gap, later P1/P2 runs explicitly use it:
 
-- Train loss decreasing, val loss flat → classic overfit signal
-- P2 starting at 4.5 (not 7+) confirms P1 embeddings loaded correctly
-- Val loss ~4.8 represents true generalization performance on unseen Wake text
-- The train/val gap existed in P1 but was invisible without a held-out set
+- P1 is now structured into regimes (sweet / plateau / fried) and uses the gap as a meltdown indicator.
+- P2 branches (e.g. P2(sweet), P2(plateau), P2(fried)) treat different levels of overfitting as starting points, to see how much damage a full fine-tune can repair.
 
-Going to have to re-run P1 with 90/10 train/val split to establish honest baseline metrics.
+This pilot P2 run is kept as the moment the project stopped pretending val loss should be flat and started using it as a control knob.
 
 ---
 
