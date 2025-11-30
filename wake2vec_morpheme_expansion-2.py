@@ -8,9 +8,9 @@ Original file is located at
 
 # Wake2Vec Morpheme Expansion Pipeline
 
-This notebook documents a controlled procedure for integrating Joyce-style neologisms into a compact GPT-type language model through morphology-aware token expansion. I curate a small lexicon of prefixes and suffixes and generate synthetic candidates, then extend the tokenizer to admit previously split neologisms as single tokens. New embeddings are initialised by morphemic composition, using the rule \(E(\text{word}) = \alpha\,E(\text{prefix}) + (1 - 2\alpha)\,E(\text{root}) + \alpha\,E(\text{suffix}) + \varepsilon\), where \(\alpha\) is a fixed weight and \(\varepsilon\) is small Gaussian noise that prevents identical vectors. Training proceeds in two stages: an embedding-only warm-up on a mixture of synthetic lines and Finnegans *Wake* text, followed by a short full-model fine-tune under conservative schedules suitable for a T4 environment.
+This notebook documents a controlled procedure for integrating Joyce-style neologisms into a compact GPT-type language model through morphology-aware token expansion. It curates a small lexicon of prefixes and suffixes and generate synthetic candidates, then extend the tokenizer to admit previously split neologisms as single tokens. New embeddings are initialised by morphemic composition, using the rule \(E(\text{word}) = \alpha\,E(\text{prefix}) + (1 - 2\alpha)\,E(\text{root}) + \alpha\,E(\text{suffix}) + \varepsilon\), where \(\alpha\) is a fixed weight and \(\varepsilon\) is small Gaussian noise that prevents identical vectors. Training proceeds in two stages: an embedding-only warm-up on a mixture of synthetic lines and Finnegans *Wake* text, followed by a short full-model fine-tune under conservative schedules suitable for a T4 environment.
 
- I report top-five neighbor overlap for the newly introduced tokens before and after training, track shifts in embedding norms, provide a t-SNE projection of the new tokens against pre-training neighbor centroids, and save JSON snapshots of neighborhoods at each stage. These diagnostics are intended to show coherent integration of the new forms into the embedding space rather than collapse or runaway drift, and to make the procedure straightforward to reproduce on modest hardware.
+Reports top-five neighbor overlap for the newly introduced tokens before and after training, track shifts in embedding norms, provide a t-SNE projection of the new tokens against pre-training neighbor centroids, and save JSON snapshots of neighborhoods at each stage. These diagnostics are intended to show coherent integration of the new forms into the embedding space rather than collapse or runaway drift, and to make the procedure straightforward to reproduce on modest hardware.
 
 **Config**
 
@@ -406,7 +406,7 @@ args1 = TrainingArguments(
     gradient_checkpointing=True,
     fp16=False,
     report_to="none",
-    optim="adafactor",          # ← use this
+    optim="adafactor",        
 )
 
 trainer1 = Trainer(model=model, args=args1, train_dataset=train_ds, data_collator=dc)
@@ -764,7 +764,7 @@ snapshot_to_drive("phase3")
 
 """# P2 LoRA boost"""
 
-# --- Phase-2 (LoRA) — your LossStreamer kept, with safe fixes ---
+# p2 lora 
 import os, json, pathlib, time
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments, Trainer, DataCollatorForLanguageModeling, TrainerCallback
@@ -778,7 +778,7 @@ ADAPT_DIR = RUN_DIR / "phase2_lora" / "final_adapters"
 PERSIST = pathlib.Path("/content/drive/MyDrive/wake2vec")
 for d in (METRICS_DIR, ADAPT_DIR, PERSIST): d.mkdir(parents=True, exist_ok=True)
 
-# -- Loss streamer (yours) --
+# loss
 class LossStreamer(TrainerCallback):
     def __init__(self, log_every=50, window=200, out_json=None):
         self.log_every = log_every
@@ -804,7 +804,7 @@ class LossStreamer(TrainerCallback):
 
 loss_cb2 = LossStreamer(log_every=50, window=200, out_json=str(METRICS_DIR/"phase2_loss_log.json"))
 
-# -- Safe imports for peft/bnb --
+# imports
 def try_import_peft():
     try:
         import peft
@@ -816,7 +816,7 @@ peft = try_import_peft()
 if peft is None:
     print("[WARN] peft not available — will train base model (no adapters) and use Adafactor.")
 
-# -- Load latest checkpoint as P2 start --
+# checkpoint for p2 start
 ckpts = sorted([p for p in RUN_DIR.glob("checkpoint-*")], key=lambda p: int(p.name.split("-")[-1]))
 ckpt_dir = str(ckpts[-1] if ckpts else RUN_DIR)
 print(f"[INFO] P2 loading from: {ckpt_dir}")
@@ -830,7 +830,7 @@ model.config.use_cache = False
 with torch.no_grad():
     model.get_output_embeddings().weight = model.get_input_embeddings().weight  # tie
 
-# -- Datasets (expects saved by P1) --
+# datasets
 train_path = RUN_DIR / "train_ds"
 valid_path = RUN_DIR / "valid_ds"
 train_ds = load_from_disk(str(train_path)) if train_path.exists() else None
@@ -839,7 +839,7 @@ assert (train_ds is not None) and (valid_ds is not None), "Tokenized datasets no
 
 dc = DataCollatorForLanguageModeling(tokenizer=tok, mlm=False)
 
-# -- Attach LoRA if available --
+# lora
 use_optim = "adamw_bnb_8bit"
 if peft is not None:
     from peft import LoraConfig, get_peft_model, TaskType
@@ -858,7 +858,7 @@ if peft is not None:
 else:
     use_optim = "adafactor"
 
-# -- TrainingArguments (fixed arg names; T4-safe) --
+# training args
 args2 = TrainingArguments(
     output_dir=str(RUN_DIR/"phase2_lora"),
     per_device_train_batch_size=1,
@@ -869,7 +869,7 @@ args2 = TrainingArguments(
     logging_strategy="steps",
     logging_steps=50,
     save_strategy="epoch",
-    evaluation_strategy="epoch",  # you had eval off; light epoch eval is fine
+    evaluation_strategy="epoch", 
     gradient_checkpointing=True,
     fp16=False, bf16=False,
     report_to=["none"],
@@ -889,11 +889,10 @@ trainer2 = Trainer(
 out2 = trainer2.train()
 print(out2)
 
-# -- Save adapters (or full model) + tokenizer, mirror to Drive --
+# save
 if peft is not None and hasattr(model, "save_pretrained"):
     model.save_pretrained(str(ADAPT_DIR), safe_serialization=True)
 else:
-    # If no peft, persist full weights so you still have a P2 artifact
     (ADAPT_DIR / "full_model").mkdir(parents=True, exist_ok=True)
     model.save_pretrained(str(ADAPT_DIR / "full_model"), safe_serialization=True)
 
@@ -914,8 +913,8 @@ import torch.nn as nn
 with torch.no_grad():
     W2 = model.get_input_embeddings().weight.detach().cpu().numpy()
     sim_pre = cosine_similarity(W2[new_ids.cpu()], W2)
-    top5_pre = np.argsort(-sim_pre, axis=1)[:,1:6]  # acts as P2 baseline
-
+    top5_pre = np.argsort(-sim_pre, axis=1)[:,1:6]  
+    
 # targets
 centroids = torch.tensor(W2[top5_pre].mean(axis=1), dtype=torch.float32, device=E.device)
 pre_norms = torch.tensor(np.load(METRICS_DIR/"pre_norms.npy")[:len(new_ids)], dtype=torch.float32, device=E.device)
