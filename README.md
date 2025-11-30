@@ -364,26 +364,21 @@ Llama-3.2-1B trials use the following configuration:
 - **PEFT adapter**: LoRA r=8 on q_proj, v_proj, gate_proj, up_proj, down_proj
 - **Regularization**: Weight decay 0.01, max grad norm 1.0, dropout 0.1
 
-### Current Status
+## Current Status (Nov 2025)
 
-Initial P1 (embeddings-only) training on TinyLlama-1.1B achieved train loss 8.4 → 0.08 over 1300 steps. However, P2 trials with a held-out validation set revealed this reflected memorization rather than generalization—validation loss remained flat at ~4.8 while train loss continued to decrease.
-### Reproducibility Notes
+Right now, the implemented and tested parts of this repo are:
 
-To replicate Llama experiments:
+- TinyLlama P1 v2:
+  - embedding-only fine-tune on *Finnegans Wake* with a 90/10 train/val split,
+  - gradient-masked base vocab, ~44.5k Wake tokens trainable,
+  - checkpoint + embedding snapshot infrastructure that survives Colab chaos.
 
-1. Request access to Llama models at https://huggingface.co/meta-llama
-2. Uninstall default Colab packages and install compatible dependencies:
-   ```bash
-   pip uninstall -y torch torchvision torchaudio triton bitsandbytes transformers accelerate peft jax jaxlib flax
-   pip install torch==2.5.1+cu121 torchvision==0.20.1+cu121 torchaudio==2.5.1+cu121 --index-url https://download.pytorch.org/whl/cu121
-   pip install triton==3.1.0 bitsandbytes==0.43.3 transformers==4.45.2 accelerate==0.34.2 peft==0.13.2 scikit-learn
-   ```
-3. Restart runtime after installation
-4. Use notebooks in `Llama/` directory with T4 or better GPU
-5. Mount Google Drive for checkpoint persistence (T4 sessions are unstable)
-6. Expect training times of 3-5 hours for P1 embedding phase, 2-3 hours for P2 LoRA fine-tune
+- LLaMA P1 (experimental):
+  - 4-bit NF4 quantised Llama-3.2-1B,
+  - Wake token injection with spherical init,
+  - embedding-only warm-up with full checkpoint mirroring to Drive.
 
-The Llama trials demonstrate that Wake2Vec's compositional embedding methodology is architecturally agnostic, though practical deployment requires careful memory management via quantization and robust checkpointing to handle Colab disconnections.
+The morpheme-aware initialisation and three-phase protocol are partially implemented.
 
 ---
 
