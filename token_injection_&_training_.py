@@ -191,7 +191,7 @@ new_ids = sorted({i for i in new_ids if i != tok.unk_token_id})
 print("New token rows:", len(new_ids))
 print("Added trainable params from embeddings ~", len(new_ids)*emb.shape[1])
 
-# Make sure the tokenizer can pad (use EOS as PAD)
+# EOS as PAD
 if tok.pad_token is None:
     tok.pad_token = tok.eos_token
     model.config.pad_token_id = tok.pad_token_id
@@ -205,7 +205,7 @@ ds = DatasetDict({
     "validation": Dataset.from_dict({"text": windows[split:]}).map(tok_map, batched=True, remove_columns=["text"]),
 })
 
-# Use causal-LM collator
+# causal-LM collator
 from transformers import DataCollatorForLanguageModeling
 collator = DataCollatorForLanguageModeling(tokenizer=tok, mlm=False, pad_to_multiple_of=8)
 
@@ -226,7 +226,7 @@ args = TrainingArguments(
     gradient_accumulation_steps=16,      # ↑ keeps effective batch
     learning_rate=6e-4,
     num_train_epochs=3,
-    fp16=False, bf16=False,              # ← no AMP, no GradScaler
+    fp16=False, bf16=False,              
     logging_steps=25,
 
     eval_strategy="epoch",
@@ -271,7 +271,7 @@ model.config.use_cache = True
 
 """if t4 disconnects"""
 
-# point to the *latest* dir inside ADAPTER_DIR
+# latest dir inside ADAPTER_DIR
 last = sorted(ADAPTER_DIR.glob("*"), key=lambda p: p.stat().st_mtime)[-1]
 print("Resuming from:", last)
 trainer.train(resume_from_checkpoint=str(last))
