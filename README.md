@@ -52,29 +52,32 @@ average embeddings of high-quality example words if a morpheme isn't single-toke
 Freeze everything except `input_embeddings` (+ tied head). Train on synthetic sentences + Wake blocks with Adafactor.
 
 **Typical hyperparameters:**
-* max_steps: 1300
-* Learning rate: 5e-4
-* Batch size: 1
-* Gradient accumulation: 16
-* Warmup ratio: 0.05
-* Save steps: 100
-* `use_cache=False`
-* No fp16 on T4
+- `max_steps`: 2000  
+- `learning_rate`: 5e-4 (AdamW)  
+- `batch_size`: 1  
+- `gradient_accumulation_steps`: 16  
+- `warmup_ratio`: 0.05  
+- `save_steps`: 100  
+- `eval_steps`: 200 (on held-out Wake blocks)  
+- `use_cache = False`  
+- `fp16 = False` (bf16 if available)  
+- Optional: `gradient_checkpointing` only if memory is tight
 
 ### Phase 2: Full model fine-tune
 Unfreeze all parameters. Fine-tune on Finnegans Wake with conservative schedules, early stopping on validation loss, and pinned software versions.
 
-**Typical hyperparameters:**
-* Epochs: 2
-* Learning rate: 2e-5
-* Warmup ratio: 0.10
-* Batch size: 8
-* Gradient accumulation: 2
-* Weight decay: 0.01
-* Save steps: 200
-* Early stopping with patience: 2
-* Gradient checkpointing enabled
-* No fp16 on T4
+**Typical hyperparameters (TinyLlama / LLaMA on T4):**
+
+- `num_train_epochs`: 2  
+- `learning_rate`: 2e-5 (main model / LoRA)  
+- `warmup_ratio`: 0.10  
+- `per_device_train_batch_size`: 8  
+- `gradient_accumulation_steps`: 2  
+- `weight_decay`: 0.01  
+- `save_steps`: 200  
+- early stopping on validation loss, `patience = 2`  
+- `gradient_checkpointing = True` (to manage memory)  
+- `fp16 = False` on T4 (bf16 preferred if available)
 
 ---
 
