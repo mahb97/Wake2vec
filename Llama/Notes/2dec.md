@@ -26,3 +26,7 @@ Resumes from 400:
 
 PyTorch now emits a security warning when torch.load is used with weights_only=False. HF’s Trainer still uses the old default to restore full training state, which is fine for Wake2vec own checkpoints, but the docs recommend weights_only=True when loading any untrusted models.
 
+**GPU quota weirdness:**  
+  Colab initially showed ~1h20 remaining on T4, then suddenly jumped to 3 hours after 20 steps.  
+  - Treating this as unexpected grace time and using it to push the Llama-3.2-1B P1-fresh run further toward step 2000. 
+
