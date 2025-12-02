@@ -394,47 +394,243 @@ os.sync()
 
 print(f"Final artifacts saved to {final_dir}")
 
-# eval 
+"""P1 eval ⬇"""
+
+# P1 Eval 
+import json, numpy as np, torch
 import matplotlib.pyplot as plt
-import numpy as np
+from pathlib import Path
 
-# Load training history
-state_files = list(LOCAL_RUN.rglob("trainer_state.json"))
-if state_files:
-    latest = max(state_files, key=lambda p: p.stat().st_mtime)
-    with open(latest) as f:
-        state = json.load(f)
-    
-    logs = state.get("log_history", [])
-    train_data = [(d["step"], d["loss"]) for d in logs if "loss" in d]
-    
-    if train_data:
-        steps, losses = zip(*train_data)
-        
-        plt.figure(figsize=(12, 6))
-        plt.plot(steps, losses, 'b-o', alpha=0.7, label='Training Loss')
-        plt.xlabel('Step')
-        plt.ylabel('Loss')
-        plt.title('Wake2Vec Llama P1: Training Loss')
-        plt.legend()
+# Paths
+WAKE2VEC_ROOT = Path("/content/drive/MyDrive/wake_llama_P1")
+SENTRY = WAKE2VEC_ROOT / "sentry_backups"
+LOCAL_RUN = Path("/content/runs/wake_llama_P1")
+
+# latest checkpoint 
+local_checkpoints = sorted(LOCAL_RUN.glob("checkpoint-*"), key=lambda p: int(p.name.split("-")[-1]))
+sentry_checkpoints = sorted(SENTRY.glob("checkpoint-*"), key=lambda p: int(p.name.split("-")[-1]))
+
+# Use latest available
+if local_checkpoints:
+    BASE_CKPT = local_checkpoints[-1]
+    print(f"[P1 EVAL] Using LOCAL checkpoint: {BASE_CKPT}")
+elif sentry_checkpoints:
+    BASE_CKPT = sentry_checkpoints[-1]
+    print(f"[P1 EVAL] Using SENTRY checkpoint: {BASE_CKPT}")
+else:
+    raise FileNotFoundError("No checkpoints found in local or Drive backup!")
+
+print(f"Checkpoint: {BASE_CKPT.name}")
+
+# Load embeds from checkpoint
+checkpoint_state = torch.load(BASE_CKPT / "pytorch_model.bin", map_location="cpu")
+
+# Find embed key
+embed_key = None
+for key in checkpoint_state.keys():
+    if "embed_tokens.weight" in key:
+        embed_key = key
+        break
+
+if embed_key is None:
+    raise KeyError("Could not find embeddings in checkpoint")
+
+E_post = checkpoint_state[embed_key].numpy()
+print(f"Loaded embeddings: {E_post.shape}")
+
+# Norm statistics
+from numpy.linalg import norm
+norms = norm(E_post, axis=1)
+
+# Get final step from checkpoint name
+final_step = int(BASE_CKPT.name.split("-")[-1])
+
+# Get final loss from trainer_state
+state_file = BASE_CKPT / "trainer_state.json"
+final_loss = None
+if state_file.exists():
+    s = json.loads(state_file.read_text())
+    logs = [d for d in s.get("log_history", []) if "loss" in d]
+    if logs:
+        final_loss = float(logs[-1]["loss"])
+
+# best checkpoint info from trainer_state 
+best_checkpoint_name = None
+if state_file.exists():
+    # reuse `s` if still in scope; otherwise reload it
+    if "s" not in locals():
+        s = json.loads(state_file.read_text())
+    best_path = s.get("best_model_checkpoint")
+    if best_path:
+        best_ckpt_path = Path(best_path)
+        best_checkpoint_name = best_ckpt_path.name
+        print(f"\n[BEST CKPT] {best_checkpoint_name}")
+    else:
+        print("\n[BEST CKPT] No best_model_checkpoint recorded in trainer_state.json")
+
+report["best_checkpoint"] = best_checkpoint_name
+
+report = {
+    "model": "meta-llama/Llama-3.2-1B",
+    "final_step": final_step,
+    "final_loss": final_loss,
+    "post_mean_norm": float(norms.mean()),
+    "post_std_norm": float(norms.std()),
+    "post_min_norm": float(norms.min()),
+    "post_max_norm": float(norms.max()),
+    "n_vocab": int(E_post.shape[0]),
+    "base_vocab": 128256,
+    "new_tokens": int(E_post.shape[0] - 128256)
+}
+
+# Base vs new token norm stats
+
+BASE_VOCAB = 128256  # consistent with report
+
+base_norms = norms[:BASE_VOCAB]
+new_norms = norms[BASE_VOCAB:]
+
+report.update({
+    "base_mean_norm": float(base_norms.mean()),
+    "base_std_norm": float(base_norms.std()),
+    "new_mean_norm": float(new_norms.mean()),
+    "new_std_norm": float(new_norms.std()),
+})
+
+print("\n[BASE VS NEW TOKEN NORMS]")
+print(f"Base tokens: mean={base_norms.mean():.3f}, std={base_norms.std():.3f}")
+print(f"New  tokens: mean={new_norms.mean():.3f}, std={new_norms.std():.3f}")
+
+# Optional: base vs new norm hist plot
+plt.figure(figsize=(10, 6))
+plt.hist(base_norms, bins=50, alpha=0.5, label="Base tokens")
+plt.hist(new_norms,  bins=50, alpha=0.5, label="New Wake tokens")
+plt.axvline(base_norms.mean(), linestyle="--", label=f"Base mean: {base_norms.mean():.2f}")
+plt.axvline(new_norms.mean(),  linestyle=":",  label=f"New mean: {new_norms.mean():.2f}")
+plt.title("Wake2Vec P1: Embedding Norms – Base vs New Tokens")
+plt.xlabel("L2 Norm")
+plt.ylabel("Frequency")
+plt.legend()
+plt.grid(True, alpha=0.3)
+
+base_new_norm_plot = WAKE2VEC_ROOT / "p1_llama_base_vs_new_norms.png"
+plt.savefig(base_new_norm_plot, dpi=150, bbox_inches="tight")
+print(f"[PLOT] Saved to {base_new_norm_plot}")
+plt.show()
+
+# Isotropy estimate (sampled pairwise cosine)
+# Unit-normalise embeds along the feature axis
+from numpy.linalg import norm as l2
+
+E_unit = E_post / l2(E_post, axis=1, keepdims=True)
+
+# sample subset for isotropy computation
+rng = np.random.default_rng(0)
+sample_size = min(5000, E_unit.shape[0])
+idx = rng.choice(E_unit.shape[0], size=sample_size, replace=False)
+E_sample = E_unit[idx]
+
+# pairwise cosine matrix 
+cos = E_sample @ E_sample.T
+
+n = cos.shape[0]
+# exclude diagonal when averaging
+mean_pairwise = (cos.sum() - np.trace(cos)) / (n * n - n)
+
+report["isotropy_mean_pairwise_cosine"] = float(mean_pairwise)
+report["isotropy_sample_size"] = int(sample_size)
+
+print(f"\n[ISOTROPY] Sample size={sample_size}, mean pairwise cosine={mean_pairwise:.4f}")
+
+# Save report
+(WAKE2VEC_ROOT / "p1_llama_summary.json").write_text(json.dumps(report, indent=2))
+print("\n[P1 SUMMARY]")
+print(json.dumps(report, indent=2))
+
+# Nearest neighbours helper (embed space sanity check)
+from transformers import AutoTokenizer
+tok = AutoTokenizer.from_pretrained(BASE_CKPT)
+
+# Reuse unit-normalised embedds
+def nearest(token_str, k=15):
+    """Print k nearest neighbours to a given token string."""
+    tid = tok.convert_tokens_to_ids(token_str)
+    if tid is None or tid < 0:
+        print(f"[NN] Token not found in vocab: {token_str!r}")
+        return
+
+    v = E_unit[tid]
+    sims = E_unit @ v  # cosine similarities because E_unit is normalised
+    topk = np.argsort(-sims)[:k+1]  # include self
+
+    print(f"\n[NN] Nearest to {token_str!r} (id={tid})")
+    for i in topk:
+        tok_str = tok.convert_ids_to_tokens(int(i))
+        print(f"  {i:6d}  {tok_str!r}  cos={sims[i]:.3f}")
+
+# probes (tbc)
+nearest(" the")
+nearest(" and")
+
+# wake tokens
+nearest("lipoleums") 
+nearest("honuphrius")
+nearest("prankquean")
+nearest("gracehoper")
+nearest("brinabride")
+
+# random sample of new Wake tokens and their nearest neighbours
+#new_ids = np.arange(BASE_VOCAB, E_post.shape[0])
+#rng = np.random.default_rng(1)
+#sample_new = rng.choice(new_ids, size=min(5, len(new_ids)), replace=False)
+
+#for tid in sample_new:
+    #token_str = tok.convert_ids_to_tokens(int(tid))
+    #print(f"\n[NN – NEW TOKEN] id={tid}, token={token_str!r}")
+    #v = E_unit[tid]
+    #sims = E_unit @ v
+    #topk = np.argsort(-sims)[:10]
+    #nn_tokens = [tok.convert_ids_to_tokens(int(i)) for i in topk]
+    #print("  nearest:", nn_tokens)
+
+# Loss plot from trainer_state
+if state_file.exists():
+    s = json.loads(state_file.read_text())
+    logs = [d for d in s.get("log_history", []) if "loss" in d]
+
+    if logs:
+        steps = [d["step"] for d in logs]
+        losses = [float(d["loss"]) for d in logs]
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(steps, losses, 'o-', alpha=0.7, label="Training Loss", markersize=4)
+        plt.title(f"Wake2Vec P1: Llama-3.2-1B Loss Curve (0→{final_step})")
+        plt.xlabel("Step")
+        plt.ylabel("Loss")
         plt.grid(True, alpha=0.3)
-        
-        plot_path = RUN_DIR / "p1_loss_curve.png"
+        plt.legend()
+
+        plot_path = WAKE2VEC_ROOT / "p1_llama_loss.png"
         plt.savefig(plot_path, dpi=150, bbox_inches="tight")
-        print(f"Plot saved: {plot_path}")
+        print(f"\n[PLOT] Saved to {plot_path}")
         plt.show()
-        
-        print(f"Initial loss: {losses[0]:.4f}")
-        print(f"Final loss: {losses[-1]:.4f}")
-        print(f"Reduction: {((losses[0] - losses[-1]) / losses[0] * 100):.1f}%")
+    else:
+        print("\n[WARNING] No loss logs found in trainer_state.json")
+else:
+    print(f"\n[WARNING] trainer_state.json not found at {state_file}")
 
-# Embedding statistics
-E = wte.weight.detach().cpu().numpy()
-norms = np.linalg.norm(E, axis=1)
+# Norm distribution plot
+plt.figure(figsize=(10, 6))
+plt.hist(norms, bins=50, alpha=0.7, edgecolor='black')
+plt.axvline(norms.mean(), color='red', linestyle='--', label=f'Mean: {norms.mean():.2f}')
+plt.title("Wake2Vec P1: Embedding Norm Distribution")
+plt.xlabel("L2 Norm")
+plt.ylabel("Frequency")
+plt.legend()
+plt.grid(True, alpha=0.3)
 
-print(f"\nEmbedding Statistics:")
-print(f"  Total tokens: {E.shape[0]}")
-print(f"  Dimensions: {E.shape[1]}")
-print(f"  Mean norm: {norms.mean():.4f}")
-print(f"  Std norm: {norms.std():.4f}")
-print(f"  Wake token norms: {norms[old_vocab:].mean():.4f} (mean)")
+norm_plot_path = WAKE2VEC_ROOT / "p1_llama_norms.png"
+plt.savefig(norm_plot_path, dpi=150, bbox_inches="tight")
+print(f"[PLOT] Saved to {norm_plot_path}")
+plt.show()
+
