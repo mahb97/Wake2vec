@@ -22,11 +22,12 @@ Resumes from 400:
 | 380  | 3.9337  | ~51.1                            |
 | 400  | 4.0217  | ~55.8                            |
 | 420  | 3.8934  | ~49.1                            |
-
+| 440  | 3.8845  | ~48.6                            |
+| 460  | 3.7942  | ~44.4                            |
+| 480  | 3.6833  | ~39.8                            |
 
 PyTorch now emits a security warning when torch.load is used with weights_only=False. HF’s Trainer still uses the old default to restore full training state, which is fine for Wake2vec own checkpoints, but the docs recommend weights_only=True when loading any untrusted models.
 
 **GPU quota weirdness:**  
   Colab initially showed ~1h20 remaining on T4, then suddenly jumped to 3 hours after 20 steps.  
   - Treating this as unexpected grace time and using it to push the Llama-3.2-1B P1-fresh run further toward step 2000. 
-
