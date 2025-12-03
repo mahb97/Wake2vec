@@ -27,6 +27,13 @@ Resumes from 400:
 | 480  | 3.6833  | ~39.8                            |
 | 500  | 3.6884  | ~40.0                            |
 | 520  | 3.6641  | ~39.0                            |
+| 540  | 3.5804  | ~35.9                            |
+| 560  | 3.5366  | ~34.3                            |
+| 580  | 3.5912  | ~36.3                            |
+| 600  | 3.4845  | ~32.6                            |
+| 620  | 3.4825  | ~32.5                            |
+| 640  | 3.4203  | ~30.6                            |
+| 660  | 3.3637  | ~28.9                            |
 
 PyTorch now emits a security warning when torch.load is used with weights_only=False. HF’s Trainer still uses the old default to restore full training state, which is fine for Wake2vec own checkpoints, but the docs recommend weights_only=True when loading any untrusted models.
 
