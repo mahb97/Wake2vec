@@ -39,4 +39,18 @@ PyTorch now emits a security warning when torch.load is used with weights_only=F
 
 **GPU quota weirdness:**  
   Colab initially showed ~1h20 remaining on T4, then suddenly jumped to 3 hours after 20 steps.  
-  - Treating this as unexpected grace time and using it to push the Llama-3.2-1B P1-fresh run further toward step 2000. 
+  - Treating this as unexpected grace time and using it to push the Llama-3.2-1B P1-fresh run further toward step 2000.
+
+**12-03 Llama-3.2-1B Wake P1 (T4 Session End)**
+
+- **Run:** `wake_llama_P1_fresh` (Llama-3.2-1B, vocab 128,256 → 172,451)
+- **Session GPU:** T4 (Colab)
+- **status:**
+  - Continued from earlier checkpoint and logged training losses up to step 740.
+  - Best observed step this session:  
+    - Step 740 → loss 3.1590, PPL ≈ 23.5 on extended Wake vocab.
+- **checkpoint stats:**
+  - Steps 720 and 740 were seen in logs but not fully checkpointed before the T4 session ended.
+  - plan is to continue towards step 2000, with existing embedding snapshots and full checkpoints enabled.
+- **note:** Even with the lost tail, this session confirms that the P1-fresh Llama run can reach sub-25 PPL on the extended Wake vocab, which will feed into the expanded P1 eval (base vs new norms, isotropy, NN probes).
+
