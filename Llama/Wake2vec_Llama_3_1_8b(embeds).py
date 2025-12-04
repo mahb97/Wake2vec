@@ -68,26 +68,31 @@ WAKE_LEX_PATH = "/content/wake_lexicon.txt"
 CORPUS_TXT = "/content/FW_TEXT.txt"
 
 # Paths 
-RUN_DIR = Path("/content/drive/MyDrive/wake_llama_P1_v2")
-LOCAL_RUN = Path("/content/runs/wake_llama_P1_v2")
+RUN_DIR = Path("/content/drive/MyDrive/wake_llama_P1_fresh")
+LOCAL_RUN = Path("/content/runs/wake_llama_P1_fresh")
 SENTRY = RUN_DIR / "sentry_backups"
 EMB_SNAPS = RUN_DIR / "emb_snaps"
 FULL_CHECKPOINTS = RUN_DIR / "full_checkpoints"
 
-for d in [RUN_DIR, LOCAL_RUN, SENTRY, EMB_SNAPS, FULL_CHECKPOINTS]:
-    d.mkdir(parents=True, exist_ok=True)
+RUN_DIR.mkdir(parents=True, exist_ok=True)
+LOCAL_RUN.mkdir(parents=True, exist_ok=True)
+SENTRY.mkdir(parents=True, exist_ok=True)
+EMB_SNAPS.mkdir(parents=True, exist_ok=True)
+FULL_CHECKPOINTS.mkdir(parents=True, exist_ok=True)
 
-RESUME_FROM = SENTRY / "checkpoint-300" if SENTRY.exists() else None
+PHASE1_EMB = FULL_CHECKPOINTS / "step_0700" / "embeddings.pt"
+USE_PHASE1 = PHASE1_EMB.exists()
+print("[PHASE2] PHASE1_EMB:", PHASE1_EMB, "exists:", USE_PHASE1)
 
-# Training hyperparameters
+# Training hyperparams
 SEQ_LEN = 512
-STRIDE = 512
-MAX_STEPS = 2000
+STRIDE = 512          
+MAX_STEPS = 6000      # up from 2000
 LOG_STEPS = 50
-SAVE_STEPS = 100
-EMB_SNAP_STEPS = 50
-LR = 5e-4
-GRAD_ACCUM = 16
+SAVE_STEPS = 200     
+EMB_SNAP_STEPS = 200 
+LR = 2e-4             # down from 5e-4
+GRAD_ACCUM = 16       
 
 print("=" * 60)
 print("CONFIGURATION")
@@ -214,9 +219,18 @@ def mask_grad(grad):
 
 wte.weight.register_hook(mask_grad)
 
-trainable = num_added * wte.weight.shape[1] if num_added > 0 else 0
-print(f"Trainable parameters: {trainable:,} (Wake embeddings only)")
-
+# load trained embeddings from step_0700 but start fresh optimiser/scheduler
+if USE_PHASE1:
+    print(f"[PHASE2] Loading embeddings from {PHASE1_EMB}")
+    saved_emb = torch.load(PHASE1_EMB, map_location=wte.weight.device)
+    if saved_emb.shape != wte.weight.shape:
+        raise ValueError(f"[PHASE2] Embedding shape mismatch: saved {saved_emb.shape}, current {wte.weight.shape}")
+    with torch.no_grad():
+        wte.weight.copy_(saved_emb.to(wte.weight.device))
+    print("[PHASE2] Embeddings loaded into model")
+else:
+    print("[PHASE2] No phase-1 embeddings found; training from spherical init.")
+    
 # Dataset
 class BlockDataset(Dataset):
     """Fixed-length block dataset for language modeling."""
@@ -357,7 +371,7 @@ args = TrainingArguments(
     max_grad_norm=1.0,
 )
 
-trainer = EmbeddingOnlyTrainer(
+trainer = EmbOnlyTrainer(
     model=model,
     args=args,
     train_dataset=train_ds,
@@ -365,18 +379,13 @@ trainer = EmbeddingOnlyTrainer(
     callbacks=[EmbeddingSnapshot(), FullCheckpoint(), SentryMirror()]
 )
 
-# Train
-print("=" * 60)
-print("WAKE2VEC LLAMA P1: EMBEDDING FINE-TUNING")
-print("=" * 60)
-print(f"Dataset: {len(train_ds)} blocks")
-print(f"Steps: {MAX_STEPS}")
-print(f"Embedding snapshots: {EMB_SNAPS}")
-print(f"Full checkpoints: {FULL_CHECKPOINTS}")
-print(f"Sentry backups: {SENTRY}")
-print("=" * 60)
+print(f"Model: {MODEL_NAME}")
+print(f"Max steps: {MAX_STEPS}")
+print(f"Embedding snapshots: {EMB_SNAPS} (every {EMB_SNAP_STEPS} steps)")
+print(f"Full checkpoints: {FULL_CHECKPOINTS} (every {SAVE_STEPS} steps)")
+print(f"Sentry backups: {SENTRY} (every {SAVE_STEPS} steps)")
 
-trainer.train(resume_from_checkpoint=str(RESUME_FROM))
+trainer.train()  
 
 print("=" * 60)
 print("TRAINING COMPLETE")
