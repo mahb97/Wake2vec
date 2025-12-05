@@ -50,6 +50,12 @@ Continues the P1 Llama-3.2-1B embedding-only Wake fine-tune from its earlier con
 
 ---
 
+Evolved P1 run (fresh optimiser, LR = 2×10⁻⁴, max_steps = 6000) started from step_0700 embeddings.  
+
+- First logged point: step 50 → loss 3.2426 (PPL ≈ 25.6), consistent with the earlier P1 trajectory in the mid-20s PPL range.
+
+---
+
 #### updated hyperparams 
 
 - Training regime:
