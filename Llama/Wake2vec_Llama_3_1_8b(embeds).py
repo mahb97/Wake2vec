@@ -58,6 +58,14 @@ from huggingface_hub import login
 HF_TOKEN = getpass("Paste HF token: ")
 login(token=HF_TOKEN, add_to_git_credential=True)
 
+import shutil, pathlib
+
+# remove old sentry 
+sentry_ck200 = pathlib.Path("/content/drive/MyDrive/wake_llama_P1_fresh/sentry_backups/checkpoint-200")
+if sentry_ck200.exists():
+    shutil.rmtree(sentry_ck200)
+    print("Deleted stale SENTRY checkpoint-200")
+
 # config
 
 SEED = 42
