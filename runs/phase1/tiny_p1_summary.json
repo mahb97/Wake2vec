@@ -1,0 +1,20 @@
+{
+  "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+  "checkpoint": "final",
+  "vocab_size": 76500,
+  "dim": 2048,
+  "base_vocab": 32000,
+  "new_tokens": 44500,
+  "post_mean_norm": 0.5977707505226135,
+  "post_std_norm": 0.09926258027553558,
+  "post_min_norm": 3.53718482401437e-19,
+  "post_max_norm": 1.0303514003753662,
+  "base_mean_norm": 0.6677978038787842,
+  "base_std_norm": 0.0963730588555336,
+  "new_mean_norm": 0.5474141240119934,
+  "new_std_norm": 0.06478776037693024,
+  "isotropy_mean_pairwise_cosine": 0.10421867668628693,
+  "isotropy_sample_size": 5000,
+  "final_train_loss": 6.6769,
+  "final_eval_loss": 11.088909149169922
+}
