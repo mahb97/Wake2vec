@@ -188,19 +188,7 @@ model.train()
 trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print(f"Tied embeddings: {emb.weight.data_ptr() == model.get_output_embeddings().weight.data_ptr()}")
 print(f"Trainable params: {trainable:,}")
-
-# grad masking 
-new_rows = torch.arange(BASE_VOCAB, len(tok), device=emb.weight.device)
-base_rows = torch.arange(0, BASE_VOCAB, device=emb.weight.device)
-
-def mask_grad(grad):
-    if grad is None:
-        return grad
-    grad[base_rows] = 0
-    return grad
-
-emb.weight.register_hook(mask_grad)
-print(f"Gradient masking: base vocab frozen, {len(new_rows)} Wake tokens trainable")
+print("no grad masking") 
 
 # callbacks 
 from transformers import TrainingArguments, Trainer, TrainerCallback, EarlyStoppingCallback
