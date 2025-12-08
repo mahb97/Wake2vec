@@ -393,11 +393,23 @@ print(f"Embedding snapshots: {EMB_SNAPS} (every {EMB_SNAP_STEPS} steps)")
 print(f"Full checkpoints: {FULL_CHECKPOINTS} (every {SAVE_STEPS} steps)")
 print(f"Sentry backups: {SENTRY} (every {SAVE_STEPS} steps)")
 
-trainer.train()  
+# resume config 
+RESUME_STEP = 200
+RESUME_CKPT = SENTRY / f"checkpoint-{RESUME_STEP}"
+resume_path = None
 
-print("=" * 60)
-print("TRAINING COMPLETE")
-print("=" * 60)
+if RESUME_CKPT.exists():
+    resume_path = str(RESUME_CKPT)
+    print(f"[RESUME] Found checkpoint at {resume_path}, resuming from there.")
+else:
+    print(f"[RESUME] No checkpoint-{RESUME_STEP} found under {SENTRY}, starting from 0.")
+
+print("[RUN] Evolved P1 from PHASE1_EMB (step_0700)")
+
+if resume_path is not None:
+    trainer.train(resume_from_checkpoint=resume_path)
+else:
+    trainer.train()
 
 # save final 
 
