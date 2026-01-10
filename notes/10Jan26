@@ -1,0 +1,23 @@
+## Training and Validation Loss — TinyLlama P1 Full-Fry
+
+| Step | Training Loss | Validation Loss |
+|------|---------------|-----------------|
+| 100  | 8.116700      | 7.165457        |
+| 200  | 5.711000      | 6.334120        |
+| 300  | 4.799100      | 6.274731        |
+| 400  | 4.138800      | 6.355618        |
+| 500  | 3.411400      | 6.513030        |
+| 600  | 2.688000      | 6.672907        |
+| 700  | 2.095300      | 6.817593        |
+
+From a classical ML perspective, step 300 is the best checkpoint so far, since it has the lowest validation loss. Beyond that point, training loss continues to fall while validation loss rises, indicating heavy overfitting to the Finnegans Wake training blocks under a frozen decoder.
+
+For this part of Wake2vec, where the aim is to explicitly fry the embedding layer, this behaviour is desirable: later checkpoints (e.g. 700+) represent increasingly distorted, Wake-specific embedding geometries, while step 300 serves as a useful “val-optimal” reference snapshot.
+
+WAKE2VEC P1 TINYLLAMA EMBED-ONLY FINE-TUNE
+
+Train: 1299 blocks | Val: 145 blocks
+
+Steps: 3000
+
+Trainable: 156,672,000 params
