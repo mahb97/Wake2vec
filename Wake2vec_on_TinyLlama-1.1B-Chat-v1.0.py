@@ -190,6 +190,21 @@ print(f"Tied embeddings: {emb.weight.data_ptr() == model.get_output_embeddings()
 print(f"Trainable params: {trainable:,}")
 print("no grad masking") 
 
+# for continuation only, skip to callbacks on first run, uncomment if needed 
+
+# from pathlib import Path
+
+# SENTRY = Path("/content/drive/MyDrive/wake2vec_tiny_p1_fryembeds/sentry_backups")
+# print("SENTRY:", SENTRY)
+# print("Exists:", SENTRY.exists())
+
+# if SENTRY.exists():
+#    ckpts = sorted(SENTRY.glob("checkpoint-*"),
+#                   key=lambda p: int(p.name.split("-")[-1]))
+#    print("Found checkpoints:", [c.name for c in ckpts])
+# else:
+#   ckpts = []
+
 # callbacks 
 from transformers import TrainingArguments, Trainer, TrainerCallback, EarlyStoppingCallback
 
