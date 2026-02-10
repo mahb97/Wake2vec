@@ -545,7 +545,7 @@ def generate_wake(
 
 
 def temperature_sweep(prompt, temps=[0.5, 0.7, 0.9, 1.0, 1.2], **kwargs):
-    """Generate the same prompt at multiple temperatures for comparison."""
+    """use same Wake prompt at multiple temperatures for comparison."""
     print(f"PROMPT: {prompt}\n")
     for t in temps:
         generate_wake(prompt, temperature=t, **kwargs)
@@ -553,7 +553,6 @@ def temperature_sweep(prompt, temps=[0.5, 0.7, 0.9, 1.0, 1.2], **kwargs):
 
 
 # test 
-
 generate_wake("riverrun, past Eve and Adam's,")
 # generate_wake("riverrun, past Eve and Adam's,", temperature=1.1)
 # generate_wake("riverrun, past Eve and Adam's,", num_return_sequences=3, temperature=0.9)
