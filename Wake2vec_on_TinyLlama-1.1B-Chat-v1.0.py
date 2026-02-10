@@ -407,68 +407,316 @@ if state_files:
             print(f"Final val loss: {v_losses[-1]:.4f}")
             print(f"Best val loss: {min(v_losses):.4f}")
 
-# embeds analysis 
+# Embedding Analysis
+
 import numpy as np
+import matplotlib.pyplot as plt
+import json
+from scipy import stats
 from numpy.linalg import norm as l2
+from sklearn.decomposition import PCA
+from sklearn.metrics.pairwise import cosine_similarity
 
 E_post = final_emb.numpy()
 vocab_size, dim = E_post.shape
+num_new = vocab_size - BASE_VOCAB
+
+E_base = E_post[:BASE_VOCAB]
+E_new = E_post[BASE_VOCAB:]
+
+# get pre-training embeddings for drift analysis
+pre_path = WAKE2VEC_ROOT / "embeddings_pre.pt"
+has_pre = pre_path.exists()
+if has_pre:
+    E_pre_all = torch.load(pre_path).numpy()
+    E_pre_base = E_pre_all[:BASE_VOCAB]
+    E_pre_new = E_pre_all[BASE_VOCAB:]
+    print(f"[PRE] got pre-training embeddings: {E_pre_all.shape}")
+else:
+    print("[PRE] No pre-training snapshot found (skipping drift analysis).")
+
+# a) NORM ANALYSIS WITH STATISTICAL TESTS
 
 norms = l2(E_post, axis=1)
 base_norms = norms[:BASE_VOCAB]
 new_norms = norms[BASE_VOCAB:]
 
-print(f"\n[NORMS - GLOBAL]")
-print(f"  Mean: {norms.mean():.4f}, Std: {norms.std():.4f}")
-print(f"  Min: {norms.min():.4f}, Max: {norms.max():.4f}")
+# Welch's t-test (doesn't assume equal variance)
+t_stat, t_pval = stats.ttest_ind(base_norms, new_norms, equal_var=False)
 
-print(f"\n[NORMS - BASE VS NEW]")
-print(f"  Base tokens: mean={base_norms.mean():.4f}, std={base_norms.std():.4f}")
-print(f"  New tokens:  mean={new_norms.mean():.4f}, std={new_norms.std():.4f}")
+# Mann-Whitney U (non-parametric, no normality assumption)
+u_stat, u_pval = stats.mannwhitneyu(base_norms, new_norms, alternative='two-sided')
 
-# Isotropy
-print(f"\n[ISOTROPY]")
-E_unit = E_post / (norms[:, None] + 1e-12)
-rng = np.random.default_rng(0)
-sample_size = min(5000, vocab_size)
-idx = rng.choice(vocab_size, size=sample_size, replace=False)
-E_sample = E_unit[idx]
-cos = E_sample @ E_sample.T
-n = cos.shape[0]
-mean_pairwise = (cos.sum() - np.trace(cos)) / (n * n - n)
-print(f"  Sample size: {sample_size}")
-print(f"  Mean pairwise cosine: {mean_pairwise:.4f}")
+# Cohen's d effect size
+pooled_std = np.sqrt((base_norms.std()**2 + new_norms.std()**2) / 2)
+cohens_d = (base_norms.mean() - new_norms.mean()) / pooled_std
 
-# Norm distribution plots
-plt.figure(figsize=(10, 6))
-plt.hist(norms, bins=50, alpha=0.7, edgecolor="black")
-plt.axvline(norms.mean(), linestyle="--", label=f"Mean: {norms.mean():.2f}")
-plt.title("Wake2Vec P1 TInyLlama Embedding Norm Distribution (All Tokens)")
-plt.xlabel("L2 norm")
-plt.ylabel("Frequency")
-plt.grid(True, alpha=0.3)
-plt.legend()
-global_norm_plot = WAKE2VEC_ROOT / "p1_TinyLlama_norms_global.png"
-plt.savefig(global_norm_plot, dpi=150, bbox_inches="tight")
-print(f"\nPlot saved: {global_norm_plot}")
+print("=" * 60)
+print("a. NORM ANALYSIS")
+print("=" * 60)
+print(f"  Global  — mean: {norms.mean():.4f}, std: {norms.std():.4f}, "
+      f"min: {norms.min():.4f}, max: {norms.max():.4f}")
+print(f"  Base    — mean: {base_norms.mean():.4f}, std: {base_norms.std():.4f} (n={BASE_VOCAB})")
+print(f"  New     — mean: {new_norms.mean():.4f}, std: {new_norms.std():.4f} (n={num_new})")
+print(f"  Welch t-test:    t={t_stat:.4f}, p={t_pval:.2e}")
+print(f"  Mann-Whitney U:  U={u_stat:.0f}, p={u_pval:.2e}")
+print(f"  Cohen's d:       {cohens_d:.4f}")
+if t_pval < 0.01:
+    print("  >> Norm distributions are significantly different (p < 0.01)")
+else:
+    print("  >> No significant difference in norm distributions")
+
+# b) EIGENVALUE-BASED ISOTROPY (Mu et al. 2018)
+
+def compute_isotropy(embeddings, label=""):
+    """Partition function isotropy: I(E) = min(Z) / max(Z)
+    where Z_i = sum_j exp(cos(e_i, e_j)).
+    Perfectly isotropic = 1.0, anisotropic -> 0.0.
+    (uses centered embeddings per Mu et al)."""
+    centered = embeddings - embeddings.mean(axis=0)
+    nrm = l2(centered, axis=1, keepdims=True)
+    nrm = np.where(nrm < 1e-12, 1e-12, nrm)
+    unit = centered / nrm
+
+    # Subsample for memory (5K tokens = standard)
+    rng = np.random.default_rng(42)
+    n = min(5000, len(unit))
+    idx = rng.choice(len(unit), size=n, replace=False)
+    sample = unit[idx]
+
+    cos_mat = sample @ sample.T
+    # Partition function per row (exclude self)
+    np.fill_diagonal(cos_mat, 0)
+    Z = np.exp(cos_mat).sum(axis=1)
+
+    isotropy = Z.min() / Z.max()
+    mean_cos = (cos_mat.sum()) / (n * (n - 1))
+    return isotropy, mean_cos, n
+
+iso_all, cos_all, n_all = compute_isotropy(E_post, "All")
+iso_base, cos_base, n_base = compute_isotropy(E_base, "Base")
+iso_new, cos_new, n_new = compute_isotropy(E_new, "New")
+
+print(f"\n{'=' * 60}")
+print("b) ISOTROPY (Mu et al. 2018 partition function ratio)")
+print("=" * 60)
+print(f"  All tokens  — isotropy: {iso_all:.6f}, mean_cos: {cos_all:.4f} (n={n_all})")
+print(f"  Base tokens — isotropy: {iso_base:.6f}, mean_cos: {cos_base:.4f} (n={n_base})")
+print(f"  New tokens  — isotropy: {iso_new:.6f}, mean_cos: {cos_new:.4f} (n={n_new})")
+print("  (1.0 = perfectly isotropic, closer to 0 = anisotropic)")
+
+# c) EMBEDDING DRIFT (base tokens, pre vs post)
+
+if has_pre:
+    # Per-token cosine similarity between pre and post
+    base_pre_norms = l2(E_pre_base, axis=1, keepdims=True)
+    base_post_norms = l2(E_base, axis=1, keepdims=True)
+    base_pre_norms = np.where(base_pre_norms < 1e-12, 1e-12, base_pre_norms)
+    base_post_norms = np.where(base_post_norms < 1e-12, 1e-12, base_post_norms)
+
+    drift_cos = np.sum(
+        (E_pre_base / base_pre_norms) * (E_base / base_post_norms), axis=1
+    )
+    drift_l2 = l2(E_base - E_pre_base, axis=1)
+
+    print(f"\n{'=' * 60}")
+    print("c. BASE TOKEN DRIFT (pre → post)")
+    print("=" * 60)
+    print(f"  Cosine sim — mean: {drift_cos.mean():.6f}, std: {drift_cos.std():.6f}")
+    print(f"              min: {drift_cos.min():.6f}, max: {drift_cos.max():.6f}")
+    print(f"  L2 dist    — mean: {drift_l2.mean():.6f}, std: {drift_l2.std():.6f}")
+    if drift_cos.mean() > 0.999:
+        print("base tokens barely moved: minimal drift")
+    elif drift_cos.mean() > 0.99:
+        print("moderate drift: base tokens shifted slightly")
+    else:
+        print("significant drift: base token representations changed substantially")
+
+    # Top 20 most-drifted base tokens
+    drift_order = np.argsort(drift_cos)
+    print(f"\n  Top 20 most-drifted base tokens:")
+    for rank, idx in enumerate(drift_order[:20]):
+        token_str = tok.convert_ids_to_tokens(int(idx))
+        print(f"    {rank+1:2d}. [{idx:5d}] {token_str!r:20s}  "
+              f"cos={drift_cos[idx]:.6f}  L2={drift_l2[idx]:.4f}")
+
+# d) NEAREST NEIGHBOR SANITY CHECKS
+
+print(f"\n{'=' * 60}")
+print("d) NEAREST NEIGHBORS (Wake tokens → base vocab)")
+print("=" * 60)
+
+# Normalize all embeddings for cosine search
+all_norms_safe = l2(E_post, axis=1, keepdims=True)
+all_norms_safe = np.where(all_norms_safe < 1e-12, 1e-12, all_norms_safe)
+E_unit = E_post / all_norms_safe
+
+# Pick sample Wake tokens (first 20 and some from the middle)
+sample_wake_ids = list(range(BASE_VOCAB, BASE_VOCAB + 10))
+if num_new > 100:
+    mid = BASE_VOCAB + num_new // 2
+    sample_wake_ids += list(range(mid, mid + 5))
+if num_new > 1000:
+    sample_wake_ids += list(range(BASE_VOCAB + num_new - 5, BASE_VOCAB + num_new))
+
+E_base_unit = E_unit[:BASE_VOCAB]
+
+for wake_id in sample_wake_ids:
+    wake_token = tok.convert_ids_to_tokens(wake_id)
+    wake_vec = E_unit[wake_id:wake_id+1]  # (1, dim)
+    sims = (wake_vec @ E_base_unit.T).squeeze()  # (BASE_VOCAB,)
+    top5 = np.argsort(sims)[-5:][::-1]
+    neighbors = [(tok.convert_ids_to_tokens(int(i)), sims[i]) for i in top5]
+    nb_str = ", ".join(f"{t!r}({s:.3f})" for t, s in neighbors)
+    print(f"  {wake_token!r:25s} → {nb_str}")
+
+# e) INTRINSIC DIMENSIONALITY (PCA) 
+print(f"\n{'=' * 60}")
+print("e) INTRINSIC DIMENSIONALITY (PCA explained variance)")
+print("=" * 60)
+
+n_components = min(100, dim, BASE_VOCAB, num_new)
+
+pca_base = PCA(n_components=n_components).fit(E_base)
+pca_new = PCA(n_components=n_components).fit(E_new)
+
+# Effective dimensionality: how many PCs to reach 90% variance
+cumvar_base = np.cumsum(pca_base.explained_variance_ratio_)
+cumvar_new = np.cumsum(pca_new.explained_variance_ratio_)
+
+dim90_base = np.searchsorted(cumvar_base, 0.90) + 1
+dim90_new = np.searchsorted(cumvar_new, 0.90) + 1
+dim95_base = np.searchsorted(cumvar_base, 0.95) + 1
+dim95_new = np.searchsorted(cumvar_new, 0.95) + 1
+
+print(f"  Base tokens — 90% variance in {dim90_base} PCs, 95% in {dim95_base} PCs")
+print(f"  New tokens  — 90% variance in {dim90_new} PCs, 95% in {dim95_new} PCs")
+print(f"  Top-1 PC explains: base={pca_base.explained_variance_ratio_[0]:.4f}, "
+      f"new={pca_new.explained_variance_ratio_[0]:.4f}")
+
+if dim90_new < dim90_base * 0.5:
+    print("New tokens occupy significantly lower-dimensional subspace")
+    print("implies embedding collapse: tokens may not be well-distributed.")
+
+# f) PAIRWISE COSINE SIMILARITY DISTRIBUTIONS 
+
+print(f"\n{'=' * 60}")
+print("f) PAIRWISE COSINE SIMILARITY DISTRIBUTIONS")
+print("=" * 60)
+
+rng = np.random.default_rng(42)
+n_sample = 2000  # per group
+
+def sample_pairwise_cosines(E1, E2, n=2000):
+    """Sample n pairwise cosine similarities between two sets."""
+    idx1 = rng.choice(len(E1), size=min(n, len(E1)), replace=False)
+    idx2 = rng.choice(len(E2), size=min(n, len(E2)), replace=False)
+    s1 = E1[idx1]
+    s2 = E2[idx2]
+    n1 = l2(s1, axis=1, keepdims=True)
+    n2 = l2(s2, axis=1, keepdims=True)
+    n1 = np.where(n1 < 1e-12, 1e-12, n1)
+    n2 = np.where(n2 < 1e-12, 1e-12, n2)
+    cos_mat = (s1 / n1) @ (s2 / n2).T
+    # Extract upper triangle (or all off-diag if cross-group)
+    if E1 is E2:
+        tri = cos_mat[np.triu_indices_from(cos_mat, k=1)]
+    else:
+        tri = cos_mat.ravel()
+    return tri
+
+cos_bb = sample_pairwise_cosines(E_base, E_base, n_sample)
+cos_nn = sample_pairwise_cosines(E_new, E_new, n_sample)
+cos_bn = sample_pairwise_cosines(E_base, E_new, n_sample)
+
+print(f"  (base,base) — mean: {cos_bb.mean():.4f}, std: {cos_bb.std():.4f}")
+print(f"  (new,new)   — mean: {cos_nn.mean():.4f}, std: {cos_nn.std():.4f}")
+print(f"  (base,new)  — mean: {cos_bn.mean():.4f}, std: {cos_bn.std():.4f}")
+
+# KS test: are new-new and base-base distributions different?
+ks_stat, ks_pval = stats.ks_2samp(cos_bb, cos_nn)
+print(f"  KS test (base-base vs new-new): D={ks_stat:.4f}, p={ks_pval:.2e}")
+
+# PLOTS 
+
+fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+fig.suptitle("Wake2Vec P1 TinyLlama — Embedding Analysis", fontsize=14, fontweight="bold")
+
+# aa) Norm histograms (base vs new)
+ax = axes[0, 0]
+ax.hist(base_norms, bins=50, alpha=0.5, label=f"Base (μ={base_norms.mean():.2f})", density=True)
+ax.hist(new_norms, bins=50, alpha=0.5, label=f"New (μ={new_norms.mean():.2f})", density=True)
+ax.set_xlabel("L2 norm")
+ax.set_ylabel("Density")
+ax.set_title("Norm Distribution: Base vs New")
+ax.legend(fontsize=8)
+ax.grid(True, alpha=0.3)
+
+# bb) Cosine similarity distributions
+ax = axes[0, 1]
+ax.hist(cos_bb, bins=80, alpha=0.4, label=f"base-base (μ={cos_bb.mean():.3f})", density=True)
+ax.hist(cos_nn, bins=80, alpha=0.4, label=f"new-new (μ={cos_nn.mean():.3f})", density=True)
+ax.hist(cos_bn, bins=80, alpha=0.4, label=f"base-new (μ={cos_bn.mean():.3f})", density=True)
+ax.set_xlabel("Cosine similarity")
+ax.set_ylabel("Density")
+ax.set_title("Pairwise Cosine Distributions")
+ax.legend(fontsize=7)
+ax.grid(True, alpha=0.3)
+
+# cc) PCA explained variance
+ax = axes[0, 2]
+ax.plot(range(1, n_components+1), cumvar_base, 'b-', label=f"Base (90%@{dim90_base})")
+ax.plot(range(1, n_components+1), cumvar_new, 'r-', label=f"New (90%@{dim90_new})")
+ax.axhline(0.90, linestyle='--', color='gray', alpha=0.5, label="90% threshold")
+ax.set_xlabel("Principal component")
+ax.set_ylabel("Cumulative explained variance")
+ax.set_title("Intrinsic Dimensionality")
+ax.legend(fontsize=8)
+ax.grid(True, alpha=0.3)
+
+# dd) Drift histogram (if available)
+ax = axes[1, 0]
+if has_pre:
+    ax.hist(drift_cos, bins=80, alpha=0.7, edgecolor="black", color="coral")
+    ax.axvline(drift_cos.mean(), linestyle='--', color='black',
+               label=f"Mean: {drift_cos.mean():.4f}")
+    ax.set_xlabel("Cosine similarity (pre → post)")
+    ax.set_ylabel("Frequency")
+    ax.set_title("Base Token Drift")
+    ax.legend(fontsize=8)
+else:
+    ax.text(0.5, 0.5, "No pre-training\nsnapshot available",
+            ha='center', va='center', transform=ax.transAxes, fontsize=12, color='gray')
+    ax.set_title("Base Token Drift (unavailable)")
+ax.grid(True, alpha=0.3)
+
+# ee) Norm scatter: base vs new position
+ax = axes[1, 1]
+ax.scatter(range(BASE_VOCAB), base_norms, s=0.1, alpha=0.3, label="Base", c="blue")
+ax.scatter(range(BASE_VOCAB, vocab_size), new_norms, s=0.1, alpha=0.3, label="New", c="red")
+ax.set_xlabel("Token index")
+ax.set_ylabel("L2 norm")
+ax.set_title("Norm by Token Index")
+ax.legend(fontsize=8, markerscale=10)
+ax.grid(True, alpha=0.3)
+
+# ff) Top PCA eigenvalue spectrum
+ax = axes[1, 2]
+ax.bar(range(1, 21), pca_base.explained_variance_ratio_[:20], alpha=0.5, label="Base")
+ax.bar(range(1, 21), pca_new.explained_variance_ratio_[:20], alpha=0.5, label="New")
+ax.set_xlabel("Principal component")
+ax.set_ylabel("Explained variance ratio")
+ax.set_title("Top-20 PC Eigenspectrum")
+ax.legend(fontsize=8)
+ax.grid(True, alpha=0.3)
+
+plt.tight_layout()
+analysis_plot = WAKE2VEC_ROOT / "p1_TinyLlama_analysis.png"
+plt.savefig(analysis_plot, dpi=150, bbox_inches="tight")
+print(f"\nPlot saved: {analysis_plot}")
 plt.show()
 
-plt.figure(figsize=(10, 6))
-plt.hist(base_norms, bins=50, alpha=0.5, label="Base tokens")
-plt.hist(new_norms, bins=50, alpha=0.5, label="New Wake tokens")
-plt.axvline(base_norms.mean(), linestyle="--", label=f"Base mean: {base_norms.mean():.2f}")
-plt.axvline(new_norms.mean(), linestyle=":", label=f"New mean: {new_norms.mean():.2f}")
-plt.title("Wake2Vec P1 TinyLlama Embedding Norms - Base vs New Tokens")
-plt.xlabel("L2 norm")
-plt.ylabel("Frequency")
-plt.grid(True, alpha=0.3)
-plt.legend()
-bv_norm_plot = WAKE2VEC_ROOT / "p1_TinyLlama_norms_base_vs_new.png"
-plt.savefig(bv_norm_plot, dpi=150, bbox_inches="tight")
-print(f"Plot saved: {bv_norm_plot}")
-plt.show()
-
-# sum json 
+# SUMMARY JSON 
 report = {
     "model": MODEL_NAME,
     "version": "v3",
@@ -476,7 +724,7 @@ report = {
     "vocab_size": int(vocab_size),
     "dim": int(dim),
     "base_vocab": int(BASE_VOCAB),
-    "new_tokens": int(vocab_size - BASE_VOCAB),
+    "new_tokens": int(num_new),
     "hyperparameters": {
         "lr": LR,
         "warmup_ratio": WARMUP_RATIO,
@@ -486,20 +734,48 @@ report = {
         "grad_accum": GRAD_ACCUM,
         "init_noise_scale": INIT_NOISE_SCALE,
     },
-    "post_mean_norm": float(norms.mean()),
-    "post_std_norm": float(norms.std()),
-    "post_min_norm": float(norms.min()),
-    "post_max_norm": float(norms.max()),
-    "base_mean_norm": float(base_norms.mean()),
-    "base_std_norm": float(base_norms.std()),
-    "new_mean_norm": float(new_norms.mean()),
-    "new_std_norm": float(new_norms.std()),
-    "isotropy_mean_pairwise_cosine": float(mean_pairwise),
-    "isotropy_sample_size": int(sample_size),
-    "final_train_loss": float(losses[-1]) if train_data else None,
-    "final_eval_loss": float(v_losses[-1]) if val_data else None,
-    "best_eval_loss": float(min(v_losses)) if val_data else None,
+    "norms": {
+        "global": {"mean": float(norms.mean()), "std": float(norms.std()),
+                    "min": float(norms.min()), "max": float(norms.max())},
+        "base": {"mean": float(base_norms.mean()), "std": float(base_norms.std())},
+        "new": {"mean": float(new_norms.mean()), "std": float(new_norms.std())},
+        "welch_t": {"t": float(t_stat), "p": float(t_pval)},
+        "mann_whitney_u": {"U": float(u_stat), "p": float(u_pval)},
+        "cohens_d": float(cohens_d),
+    },
+    "isotropy": {
+        "all": {"score": float(iso_all), "mean_cos": float(cos_all), "n": int(n_all)},
+        "base": {"score": float(iso_base), "mean_cos": float(cos_base), "n": int(n_base)},
+        "new": {"score": float(iso_new), "mean_cos": float(cos_new), "n": int(n_new)},
+    },
+    "pairwise_cosine": {
+        "base_base": {"mean": float(cos_bb.mean()), "std": float(cos_bb.std())},
+        "new_new": {"mean": float(cos_nn.mean()), "std": float(cos_nn.std())},
+        "base_new": {"mean": float(cos_bn.mean()), "std": float(cos_bn.std())},
+        "ks_test_bb_vs_nn": {"D": float(ks_stat), "p": float(ks_pval)},
+    },
+    "intrinsic_dim": {
+        "base_90pct": int(dim90_base), "base_95pct": int(dim95_base),
+        "new_90pct": int(dim90_new), "new_95pct": int(dim95_new),
+        "base_top1_var": float(pca_base.explained_variance_ratio_[0]),
+        "new_top1_var": float(pca_new.explained_variance_ratio_[0]),
+    },
+    "loss": {
+        "final_train": float(losses[-1]) if train_data else None,
+        "final_eval": float(v_losses[-1]) if val_data else None,
+        "best_eval": float(min(v_losses)) if val_data else None,
+    },
 }
+
+if has_pre:
+    report["drift"] = {
+        "cosine_mean": float(drift_cos.mean()),
+        "cosine_std": float(drift_cos.std()),
+        "cosine_min": float(drift_cos.min()),
+        "cosine_max": float(drift_cos.max()),
+        "l2_mean": float(drift_l2.mean()),
+        "l2_std": float(drift_l2.std()),
+    }
 
 summary_path = WAKE2VEC_ROOT / "p1_TinyLlama_summary.json"
 summary_path.write_text(json.dumps(report, indent=2))
