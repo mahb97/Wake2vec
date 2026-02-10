@@ -505,3 +505,56 @@ summary_path = WAKE2VEC_ROOT / "p1_TinyLlama_summary.json"
 summary_path.write_text(json.dumps(report, indent=2))
 print(f"\n[SUMMARY] Saved to {summary_path}")
 print(json.dumps(report, indent=2))
+
+# Wake gen 
+model.eval()
+model.config.use_cache = True
+
+def generate_wake(
+    prompt,
+    max_new_tokens=256,
+    temperature=0.9,
+    top_p=0.92,
+    top_k=50,
+    repetition_penalty=1.15,
+    num_return_sequences=1,
+):
+    inputs = tok(prompt, return_tensors="pt").to("cuda")
+    prompt_len = inputs["input_ids"].shape[1]
+
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            repetition_penalty=repetition_penalty,
+            num_return_sequences=num_return_sequences,
+            do_sample=True,
+            pad_token_id=tok.pad_token_id,
+        )
+
+    print(f"── temp={temperature} | top_p={top_p} | top_k={top_k} | rep={repetition_penalty} ──")
+    for i, seq in enumerate(outputs):
+        generated = tok.decode(seq[prompt_len:], skip_special_tokens=True)
+        if num_return_sequences > 1:
+            print(f"\n[{i+1}]")
+        print(generated)
+    print("─" * 60)
+
+
+def temperature_sweep(prompt, temps=[0.5, 0.7, 0.9, 1.0, 1.2], **kwargs):
+    """Generate the same prompt at multiple temperatures for comparison."""
+    print(f"PROMPT: {prompt}\n")
+    for t in temps:
+        generate_wake(prompt, temperature=t, **kwargs)
+        print()
+
+
+# test 
+
+generate_wake("riverrun, past Eve and Adam's,")
+# generate_wake("riverrun, past Eve and Adam's,", temperature=1.1)
+# generate_wake("riverrun, past Eve and Adam's,", num_return_sequences=3, temperature=0.9)
+# temperature_sweep("riverrun, past Eve and Adam's,")
