@@ -32,9 +32,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
+# Config
 
 class Config:
     # paths
@@ -42,8 +40,8 @@ class Config:
     wake_lexicon_path = "/Users/maymaybiehle/Desktop/wake2vec/wake_lexicon.txt"
     output_dir = "/Users/maymaybiehle/Desktop/wake2vec/grassmann_experiment"
 
-    # model architecture (matched to Zhang Chong's setup)
-    vocab_size = 8192          # character-level BPE — will be set after tokenizer init
+    # model architecture
+    vocab_size = 8192          # character-level BPE (will be set after tokenizer init)
     d_model = 256              # hidden dimension
     n_layers = 6               # number of layers
     n_heads = 4                # attention heads (transformer only)
@@ -62,9 +60,9 @@ class Config:
     epochs = 30
     warmup_steps = 500
     grad_clip = 1.0
-    eval_interval = 500        # steps between evals
-    save_interval = 2000       # steps between checkpoint saves
-    log_interval = 100         # steps between log prints
+    eval_interval = 500        
+    save_interval = 2000       
+    log_interval = 100        
 
     # generation
     gen_length = 512
@@ -77,13 +75,10 @@ class Config:
         "cuda" if torch.cuda.is_available() else "cpu"
     )
 
-
-# ---------------------------------------------------------------------------
 # Simple byte-pair-ish tokenizer (character-level with merges)
-# ---------------------------------------------------------------------------
 
 class CharTokenizer:
-    """Minimal character-level tokenizer with a few Wake-aware merges."""
+    """Min character-level tok with wake aware merge"""
 
     def __init__(self):
         self.char_to_id = {}
@@ -118,10 +113,7 @@ class CharTokenizer:
         self.vocab_size = len(self.char_to_id)
         return self
 
-
-# ---------------------------------------------------------------------------
 # Dataset
-# ---------------------------------------------------------------------------
 
 class TextDataset(Dataset):
     """Sliding-window dataset over tokenized text."""
@@ -139,10 +131,7 @@ class TextDataset(Dataset):
         y = torch.tensor(chunk[1:], dtype=torch.long)
         return x, y
 
-
-# ---------------------------------------------------------------------------
 # Shared building blocks
-# ---------------------------------------------------------------------------
 
 class FFN(nn.Module):
     def __init__(self, d_model, d_ff, dropout=0.1):
@@ -154,10 +143,7 @@ class FFN(nn.Module):
     def forward(self, x):
         return self.w2(self.dropout(F.gelu(self.w1(x))))
 
-
-# ---------------------------------------------------------------------------
-# Model A: Standard Causal Self-Attention Transformer
-# ---------------------------------------------------------------------------
+# Model A: Standard Causal Self-Attention Transformer 
 
 class CausalSelfAttention(nn.Module):
     def __init__(self, d_model, n_heads, max_seq_len, dropout=0.1):
@@ -245,10 +231,7 @@ class TransformerLM(nn.Module):
     def count_params(self):
         return sum(p.numel() for p in self.parameters())
 
-
-# ---------------------------------------------------------------------------
 # Model B: Causal Grassmann Mixing LM
-# ---------------------------------------------------------------------------
 
 class GrassmannMixingBlock(nn.Module):
     """
@@ -269,13 +252,13 @@ class GrassmannMixingBlock(nn.Module):
         self.windows = windows or [1, 2, 4, 8, 12, 16]
         self.plucker_dim = r * (r - 1) // 2  # C(r, 2)
 
-        # step 1: reduce d -> r
+        # 1: reduce d -> r
         self.W_red = nn.Linear(d_model, r)
 
-        # step 4: project plucker coords back to d_model
+        # 2: project plucker coords back to d_model
         self.W_plu = nn.Linear(self.plucker_dim, d_model)
 
-        # step 5: gated fusion
+        # 3: gated fusion
         self.W_gate = nn.Linear(2 * d_model, d_model)
 
         self.ln = nn.LayerNorm(d_model)
@@ -311,10 +294,10 @@ class GrassmannMixingBlock(nn.Module):
         """
         B, L, D = h.shape
 
-        # Step 1: linear reduction
+        # a: linear reduction
         z = self.W_red(h)  # (B, L, r)
 
-        # Steps 2-3: multi-scale pairing + Plucker encoding
+        # a-b: multi-scale pairing + Plucker encoding
         # accumulate grassmann features per position
         g_accum = torch.zeros(B, L, D, device=h.device)
         count = torch.zeros(B, L, 1, device=h.device)
@@ -323,7 +306,7 @@ class GrassmannMixingBlock(nn.Module):
             if delta >= L:
                 continue
             # causal: pair position t with t+delta (look-ahead for LM)
-            # Actually for causal LM we pair t with t-delta (look back)
+            # Actually for causal LM it needs to pair t with t-delta (look back)
             # so position t sees positions t-delta (past context)
             if delta > 0:
                 z_t = z[:, delta:, :]       # positions delta..L-1
@@ -347,7 +330,7 @@ class GrassmannMixingBlock(nn.Module):
         count = torch.clamp(count, min=1.0)
         g = g_accum / count  # (B, L, D)
 
-        # Step 5: gated fusion
+        # d: gated fusion
         u = torch.cat([h, g], dim=-1)  # (B, L, 2D)
         alpha = torch.sigmoid(self.W_gate(u))  # (B, L, D)
         h_mix = alpha * h + (1.0 - alpha) * g
@@ -355,7 +338,6 @@ class GrassmannMixingBlock(nn.Module):
         # LayerNorm + dropout
         h_mix = self.dropout(self.ln(h_mix))
         return h_mix
-
 
 class GrassmannTransformerBlock(nn.Module):
     """Grassmann mixing + FFN, mirroring TransformerBlock structure."""
@@ -371,7 +353,6 @@ class GrassmannTransformerBlock(nn.Module):
         x = x + self.grass(self.ln1(x))
         x = x + self.ffn(self.ln2(x))
         return x
-
 
 class GrassmannLM(nn.Module):
     def __init__(self, cfg):
@@ -419,10 +400,7 @@ class GrassmannLM(nn.Module):
     def count_params(self):
         return sum(p.numel() for p in self.parameters())
 
-
-# ---------------------------------------------------------------------------
 # Training utilities
-# ---------------------------------------------------------------------------
 
 def get_lr(step, warmup_steps, lr, total_steps):
     """Cosine schedule with linear warmup."""
@@ -431,7 +409,6 @@ def get_lr(step, warmup_steps, lr, total_steps):
     decay_ratio = (step - warmup_steps) / max(1, total_steps - warmup_steps)
     coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
     return lr * max(coeff, 0.1)  # floor at 10% of base lr
-
 
 @torch.no_grad()
 def estimate_loss(model, dataloader, device, max_batches=50):
@@ -446,7 +423,6 @@ def estimate_loss(model, dataloader, device, max_batches=50):
         losses.append(loss.item())
     model.train()
     return sum(losses) / len(losses) if losses else float("inf")
-
 
 @torch.no_grad()
 def generate(model, tokenizer, prompt, max_new_tokens=256, temperature=0.8, top_k=50, device="cpu"):
@@ -472,10 +448,7 @@ def generate(model, tokenizer, prompt, max_new_tokens=256, temperature=0.8, top_
     model.train()
     return tokenizer.decode(x[0].tolist())
 
-
-# ---------------------------------------------------------------------------
-# Stylometry: simple character n-gram analysis
-# ---------------------------------------------------------------------------
+# Stylometry with only simple character n-gram analysis 
 
 def char_ngram_profile(text, n=3, top_k=200):
     """Return a frequency-ranked dict of character n-grams."""
@@ -483,7 +456,6 @@ def char_ngram_profile(text, n=3, top_k=200):
     counts = Counter(ngrams)
     total = sum(counts.values())
     return {ng: c / total for ng, c in counts.most_common(top_k)}
-
 
 def burrows_delta(profile_a, profile_b, top_k=200):
     """
@@ -498,10 +470,7 @@ def burrows_delta(profile_a, profile_b, top_k=200):
         delta += abs(fa - fb)
     return delta / len(all_ngrams) if all_ngrams else 0.0
 
-
-# ---------------------------------------------------------------------------
-# Main training loop
-# ---------------------------------------------------------------------------
+# Main training loop 
 
 def train_model(model, model_name, train_loader, val_loader, cfg, tokenizer):
     """Train a model and return training history."""
@@ -586,15 +555,15 @@ def train_model(model, model_name, train_loader, val_loader, cfg, tokenizer):
     return history
 
 
-# ---------------------------------------------------------------------------
-# Full experiment
-# ---------------------------------------------------------------------------
+
+
+# Full experiment 
 
 def run_experiment(mode="train"):
     cfg = Config()
     os.makedirs(cfg.output_dir, exist_ok=True)
 
-    # ---- Load and tokenize text ----
+    # Load and tokenize text
     print("Loading Finnegans Wake text...")
     with open(cfg.fw_text_path, "r", encoding="utf-8") as f:
         raw_text = f.read()
@@ -631,7 +600,7 @@ def run_experiment(mode="train"):
     print(f"  Val samples: {len(val_ds):,}")
     print(f"  Steps per epoch: {len(train_loader)}")
 
-    # ---- Build models ----
+    # Build models 
     transformer_model = TransformerLM(cfg)
     grassmann_model = GrassmannLM(cfg)
 
@@ -639,7 +608,7 @@ def run_experiment(mode="train"):
     print(f"GrassmannLM params:   {grassmann_model.count_params():,}")
 
     if mode == "train":
-        # ---- Train both models ----
+        # Train both models
         print("\n" + "=" * 60)
         print("PHASE 1: Training TransformerLM (attention baseline)")
         print("=" * 60)
@@ -654,7 +623,7 @@ def run_experiment(mode="train"):
             grassmann_model, "grassmann", train_loader, val_loader, cfg, tokenizer
         )
 
-        # ---- Summary ----
+        # Summary
         print("\n" + "=" * 60)
         print("TRAINING SUMMARY")
         print("=" * 60)
@@ -664,7 +633,7 @@ def run_experiment(mode="train"):
             print(f"GrassmannLM  best val PPL: {min(g_hist['val_ppl']):.1f}")
 
     elif mode == "generate":
-        # ---- Generate samples from both models ----
+        # samples from both models
         prompts = [
             "riverrun, past Eve and Adam's",
             "the fall of a once wallstrait oldparr",
@@ -712,7 +681,7 @@ def run_experiment(mode="train"):
             print(f"\nSaved generations to {gen_path}")
 
     elif mode == "eval":
-        # ---- Evaluate: perplexity + stylometry ----
+        # Eval: perplexity + stylometry 
         print("\n" + "=" * 60)
         print("EVALUATION: Perplexity + Stylometric Analysis")
         print("=" * 60)
@@ -798,10 +767,7 @@ def run_experiment(mode="train"):
         print(f"Unknown mode: {mode}")
         print("Usage: --mode train|generate|eval")
 
-
-# ---------------------------------------------------------------------------
 # Entry point
-# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Grassmann vs Attention Wake2Vec Experiment")
