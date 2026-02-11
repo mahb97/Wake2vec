@@ -324,6 +324,11 @@ args = TrainingArguments(
     max_grad_norm=1.0,
 )
 
+# Save pre-training embedding snapshot
+E_pre = model.get_input_embeddings().weight.detach().cpu().clone()
+torch.save(E_pre, WAKE2VEC_ROOT / "embeddings_pre.pt")
+print(f"[PRE] Saved pre-training embeddings: {E_pre.shape}")
+
 # trianer 
 trainer = Trainer(
     model=model,
