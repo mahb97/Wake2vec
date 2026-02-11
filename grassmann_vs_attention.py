@@ -1,12 +1,21 @@
 """
 Grassmann Flows vs. Self-Attention: A Wake2Vec Experiment
-=========================================================
 
 Side-by-side comparison of two small (~15M param) language models
 trained from scratch on Finnegans Wake:
 
   Model A: Standard causal self-attention transformer
-  Model B: Causal Grassmann mixing (Zhang Chong, arXiv:2512.19428)
+  Model B: Causal Grassmann mixing (Zhang Chong, arXiv:2512.19428) 
+https://doi.org/10.48550/arXiv.2512.19428 
+@misc{chong2025attentionneed,
+      title={Attention Is Not What You Need}, 
+      author={Zhang Chong},
+      year={2025},
+      eprint={2512.19428},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2512.19428}, 
+}
 
 Both share identical embeddings, FFN, LayerNorm, and output head.
 The ONLY difference is the sequence mixing mechanism.
@@ -36,9 +45,9 @@ from torch.utils.data import Dataset, DataLoader
 
 class Config:
     # paths
-    fw_text_path = "/Users/maymaybiehle/Desktop/FW_TEXT.txt"
-    wake_lexicon_path = "/Users/maymaybiehle/Desktop/wake2vec/wake_lexicon.txt"
-    output_dir = "/Users/maymaybiehle/Desktop/wake2vec/grassmann_experiment"
+    fw_text_path = "/Users/kyri/Desktop/FW_TEXT.txt"
+    wake_lexicon_path = "/Users/kyri/Desktop/wake2vec/wake_lexicon.txt"
+    output_dir = "/Users/kyri/Desktop/wake2vec/grassmann_experiment"
 
     # model architecture
     vocab_size = 8192          # character-level BPE (will be set after tokenizer init)
