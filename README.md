@@ -46,38 +46,69 @@ average embeddings of high-quality example words if a morpheme isn't single-toke
 
 ---
 
-## Two-Phase Protocol (Standard)
+# Two-Phase Protocol
 
-### Phase 1: Embedding-only warm-up
-Freeze everything except `input_embeddings` (+ tied head). Train on synthetic sentences + Wake blocks with Adafactor.
+### Phase 1: Embedding-Only Training
 
-**Typical hyperparameters:**
-- `max_steps`: 2000  
-- `learning_rate`: 5e-4 (AdamW)  
-- `batch_size`: 1  
-- `gradient_accumulation_steps`: 16  
-- `warmup_ratio`: 0.05  
-- `save_steps`: 100  
-- `eval_steps`: 200 (on held-out Wake blocks)  
-- `use_cache = False`  
-- `fp16 = False` (bf16 if available)  
-- Optional: `gradient_checkpointing` only if memory is tight
+Freeze the entire transformer. Train only `input_embeddings` (tied with the output head). Two variants have been tested:
 
-### Phase 2: Full model fine-tune
-Unfreeze all parameters. Fine-tune on Finnegans Wake with conservative schedules, early stopping on validation loss, and pinned software versions.
+**Variant A (Gradient Masking):** Only Wake token embedding rows receive gradients. Base vocabulary rows are frozen via a backward hook that zeros their gradients. This preserves the original embedding geometry while integrating new tokens.
 
-**Typical hyperparameters (TinyLlama / LLaMA on T4):**
+**Variant B (Full Embedding Training):** All embedding rows are trainable, including base vocabulary. This allows the model to co-adapt base and Wake token representations at the cost of base token drift. Referred to internally as the "fry embeds" configuration.
 
-- `num_train_epochs`: 2  
-- `learning_rate`: 2e-5 (main model / LoRA)  
-- `warmup_ratio`: 0.10  
-- `per_device_train_batch_size`: 8  
-- `gradient_accumulation_steps`: 2  
-- `weight_decay`: 0.01  
-- `save_steps`: 200  
-- early stopping on validation loss, `patience = 2`  
-- `gradient_checkpointing = True` (to manage memory)  
-- `fp16 = False` on T4 (bf16 preferred if available)
+**Phase 1 Hyperparameters (TinyLlama-1.1B on T4):**
+
+| Parameter | Variant A | Variant B |
+|:--|:--|:--|
+| Optimizer | Adafactor | Adafactor |
+| Learning rate | 5e-4 | 3e-4 |
+| Max steps | 1,300 | 3,000 |
+| Batch size | 1 (effective 16) | 1 (effective 16) |
+| Gradient accumulation | 16 | 16 |
+| Warmup ratio | 0.05 | 0.10 |
+| Sequence length | 256 | 256 |
+| Precision | fp32 | fp32 |
+| Gradient masking | Enabled | Disabled |
+| Save steps | 100 | 100 |
+| Eval steps | 200 | 100 |
+| use_cache | False | False |
+| Gradient checkpointing | Enabled | Not required |
+
+### Phase 2: LoRA Fine-Tune
+
+Load P1 embeddings and freeze them entirely. Apply LoRA adapters to attention and MLP projections. The model learns to use the Wake-adapted embeddings through attention redistribution and MLP adaptation rather than further embedding modification.
+
+**LoRA Configuration:**
+
+| Parameter | Value |
+|:--|:--|
+| Rank | 8 |
+| Alpha | 16 |
+| Dropout | 0.1 |
+| Target modules | q_proj, k_proj, v_proj, gate_proj, up_proj, down_proj |
+
+k_proj is included alongside q_proj and v_proj to allow symmetric reshaping of attention patterns. MLP layers (gate, up, down) are targeted because Wake morphology requires adaptation of token-to-meaning mappings beyond attention redistribution alone.
+
+**Phase 2 Hyperparameters (TinyLlama-1.1B, 4-bit quantized, on T4):**
+
+| Parameter | Value |
+|:--|:--|
+| Quantization | 4-bit NF4 (double quantization, bfloat16 compute) |
+| Trainable parameters | ~5.6M (LoRA adapters only) |
+| Embeddings | Frozen (loaded from P1) |
+| Learning rate | 2e-5 |
+| LR scheduler | Cosine decay |
+| Warmup ratio | 0.10 |
+| Batch size | 8 (effective 16) |
+| Gradient accumulation | 2 |
+| Weight decay | 0.01 |
+| Sequence length | 256 |
+| Max steps | 3,000 |
+| Save steps | 200 |
+| Eval steps | 200 |
+| Precision | bf16 |
+| Max gradient norm | 1.0 |
+| Gradient checkpointing | Disabled (required for 4-bit + LoRA compatibility) |
 
 ---
 
