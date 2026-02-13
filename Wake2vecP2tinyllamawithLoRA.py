@@ -114,6 +114,10 @@ LORA_TARGETS = ["q_proj", "k_proj", "v_proj", "gate_proj", "up_proj", "down_proj
 # Base vocab (TinyLlama)
 BASE_VOCAB = 32000
 
+# Resume
+# RESUME_FROM = None
+RESUME_FROM = SENTRY / "checkpoint-1000"
+
 print("WAKE2VEC PHASE 2: LoRA CONFIG")
 print(f"  P1 source: {P1_SOURCE}")
 print(f"  Output: {RUN_DIR}")
@@ -445,8 +449,19 @@ print(f"  LoRA targets: {LORA_TARGETS}")
 print(f"  Embeddings: FROZEN")
 print("=" * 60)
 
+# t0 = time.time()
+# trainer.train()
+# elapsed = (time.time() - t0) / 60
+
 t0 = time.time()
-trainer.train()
+if RESUME_FROM is not None:
+    local_ckpt = LOCAL_RUN / RESUME_FROM.name
+    if not local_ckpt.exists():
+        shutil.copytree(RESUME_FROM, local_ckpt)
+    print(f"[RESUME] Resuming from {RESUME_FROM.name}")
+    trainer.train(resume_from_checkpoint=str(local_ckpt))
+else:
+    trainer.train()
 elapsed = (time.time() - t0) / 60
 
 print(f"\nTRAINING COMPLETE ({elapsed:.1f} minutes)")
