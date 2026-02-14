@@ -6,7 +6,7 @@ file name is obviously a joke because i have no life.
 | --- | --- | --- |
 | 1200 | 0.5797 | 0.6255 |
 | 1400 | 0.638800	| 0.639327 |
-
+| 1600 | 0.572200	| 0.646048 |
 
 no overfitting red flags at this point.
 
