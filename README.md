@@ -2,7 +2,19 @@
 
 ## TL;DR
 
-Extend a small GPT-style tokenizer with curated *Finnegans Wake* morphemes, initialise new vectors by morpheme composition, and fine-tune with a two-phase protocol (embedding warm-up + full fine-tune or optional three-phase with LoRA) that protects stability. Report geometry shifts (top-k neighbour overlap, embedding norm deltas, isotropy and PIP loss if requested), language behaviour (validation loss and perplexity on held-out Wake slices), and qualitative intrusion. The full pipeline reproduces on a Colab T4.
+Fine-tune LLMs on *Finnegans Wake* by injecting ~45K Joyce-specific tokens into the embedding layer and training in two phases: embedding-only warm-up (P1) then LoRA adaptation (P2). Currently testing across TinyLlama 1.1B, Llama 3.2-1B, Llama 3.2-3B, and Llama 3.1-8B on free Colab T4 GPUs. The whole point is to see which model produces the best Wake-like output. This is very much a work in progress.
+
+---
+
+## Models
+
+| Model | Params | Phase | Status | VRAM (4-bit) |
+|---|---|---|---|---|
+| TinyLlama-1.1B | 1.1B | P1 complete, P2 running | P1 done (loss 8.46 -> 0.079). P2 at step 2000/3000, overfitting starting | ~4GB |
+| Llama 3.2-1B | 1B | P1 running | Step 400, val_loss=7.58, on track | ~3-4GB |
+| Llama 3.2-3B | 3B | P1 script ready | Not started | ~5-6GB |
+| Llama 3.1-8B | 8B | P1 script ready | Not started. Biggest Llama that fits on free T4 | ~9-10GB |
+| Qwen 2.5-14B | 14B | Sketch only | Aspirational. Rough VRAM math in devlog, no script | ~12-13GB |
 
 ---
 
@@ -48,67 +60,106 @@ average embeddings of high-quality example words if a morpheme isn't single-toke
 
 # Two-Phase Protocol
 
+### Wake Lexicon
+
+`wake_lexicon.txt` contains 44,989 unique tokens extracted from Finnegans Wake: neologisms, multilingual mashups, accented forms, and Joyce-specific compounds. These get added to whatever base tokenizer we're using. For models with larger vocabs (Llama 3.x has 128K vs TinyLlama's 32K), some Wake tokens already exist in the base vocab and don't need to be added.
+
 ### Phase 1: Embedding-Only Training
 
-Freeze the entire transformer. Train only `input_embeddings` (tied with the output head). Two variants have been tested:
+Freeze the entire transformer. Only the embedding layer is trainable.
 
-**Variant A (Gradient Masking):** Only Wake token embedding rows receive gradients. Base vocabulary rows are frozen via a backward hook that zeros their gradients. This preserves the original embedding geometry while integrating new tokens.
+- New Wake tokens initialized on a sphere (random direction, radius = 1.5x base embedding std * sqrt(dim))
+- Gradient masking: only the new Wake token rows receive gradients. Base vocabulary rows are zeroed via a backward hook. This prevents catastrophic forgetting
+- Input and output embeddings are tied
+- A frozen LoRA r=1 adapter on q_proj is included purely for PEFT compatibility with quantized models -- it contributes nothing to training
 
-**Variant B (Full Embedding Training):** All embedding rows are trainable, including base vocabulary. This allows the model to co-adapt base and Wake token representations at the cost of base token drift. Referred to internally as the "fry embeds" configuration.
-
-**Phase 1 Hyperparameters (TinyLlama-1.1B on T4):**
-
-| Parameter | Variant A | Variant B |
-|:--|:--|:--|
-| Optimizer | Adafactor | Adafactor |
-| Learning rate | 5e-4 | 3e-4 |
-| Max steps | 1,300 | 3,000 |
-| Batch size | 1 (effective 16) | 1 (effective 16) |
-| Gradient accumulation | 16 | 16 |
-| Warmup ratio | 0.05 | 0.10 |
-| Sequence length | 256 | 256 |
-| Precision | fp32 | fp32 |
-| Gradient masking | Enabled | Disabled |
-| Save steps | 100 | 100 |
-| Eval steps | 200 | 100 |
-| use_cache | False | False |
-| Gradient checkpointing | Enabled | Not required |
+The goal is to get the new Wake tokens into a reasonable region of embedding space before asking the model to actually use them.
 
 ### Phase 2: LoRA Fine-Tune
 
-Load P1 embeddings and freeze them entirely. Apply LoRA adapters to attention and MLP projections. The model learns to use the Wake-adapted embeddings through attention redistribution and MLP adaptation rather than further embedding modification.
+Load P1 embeddings and freeze them. Apply LoRA adapters to attention and MLP projections. The model learns to *use* the Wake-adapted embeddings through attention redistribution and MLP adaptation.
 
-**LoRA Configuration:**
+**LoRA targets:** q_proj, k_proj, v_proj, gate_proj, up_proj, down_proj
+
+k_proj is included alongside q/v to allow symmetric reshaping of attention patterns. MLP layers are targeted because Wake morphology requires adaptation of token-to-meaning mappings beyond attention alone.
+
+Only implemented for TinyLlama so far.
+## Training Configs
+
+### Phase 1 (Embedding-Only)
+
+| | TinyLlama 1.1B | Llama 3.2-1B | Llama 3.2-3B | Llama 3.1-8B |
+|---|---|---|---|---|
+| Base vocab | 32,000 | 128,256 | 128,256 | 128,256 |
+| + Wake tokens | ~44,989 | varies (some already in vocab) | same | same |
+| Quantization | fp32 (whole model) | 4-bit NF4 | 4-bit NF4 | 4-bit NF4 |
+| Optimizer | Adafactor | AdamW | AdamW | AdamW |
+| LR | 5e-4 | 2e-4 | 2e-4 | 2e-4 |
+| Warmup | 5% | 5% | 5% | 5% |
+| Batch | 1 (effective 16) | 1 (effective 16) | 1 (effective 16) | 1 (effective 16) |
+| Seq len | 256 | 512 | 256 | 256 |
+| Steps | 1,300 | 3,000 | 3,000 | 3,000 |
+| Save every | 100 | 50 | 50 | 50 |
+
+### Phase 2 (LoRA) -- TinyLlama only
 
 | Parameter | Value |
-|:--|:--|
-| Rank | 8 |
-| Alpha | 16 |
-| Dropout | 0.1 |
-| Target modules | q_proj, k_proj, v_proj, gate_proj, up_proj, down_proj |
-
-k_proj is included alongside q_proj and v_proj to allow symmetric reshaping of attention patterns. MLP layers (gate, up, down) are targeted because Wake morphology requires adaptation of token-to-meaning mappings beyond attention redistribution alone.
-
-**Phase 2 Hyperparameters (TinyLlama-1.1B, 4-bit quantized, on T4):**
-
-| Parameter | Value |
-|:--|:--|
-| Quantization | 4-bit NF4 (double quantization, bfloat16 compute) |
-| Trainable parameters | ~5.6M (LoRA adapters only) |
-| Embeddings | Frozen (loaded from P1) |
-| Learning rate | 2e-5 |
-| LR scheduler | Cosine decay |
-| Warmup ratio | 0.10 |
-| Batch size | 8 (effective 16) |
-| Gradient accumulation | 2 |
+|---|---|
+| Quantization | 4-bit NF4, double quant, bfloat16 compute |
+| LoRA rank | 8 |
+| LoRA alpha | 16 |
+| LoRA dropout | 0.1 |
+| Trainable params | ~5.6M |
+| Embeddings | Frozen (from P1) |
+| LR | 2e-5 |
+| Warmup | 10% |
+| Batch | 8 (effective 16, grad accum 2) |
+| Seq len | 256 |
+| Steps | 3,000 |
 | Weight decay | 0.01 |
-| Sequence length | 256 |
-| Max steps | 3,000 |
-| Save steps | 200 |
-| Eval steps | 200 |
-| Precision | bf16 |
-| Max gradient norm | 1.0 |
-| Gradient checkpointing | Disabled (required for 4-bit + LoRA compatibility) |
+
+## Data
+
+- **Finnegans Wake corpus** (`FW_TEXT.txt`): 24,483 lines. Primary training text
+- **Wake lexicon** (`wake_lexicon.txt`): 44,989 tokens. Injected into tokenizer and concatenated with FW text for training
+- **Train/val split**: 90/10, seed 42
+- **Block size**: Non-overlapping chunks of seq_len tokens
+
+## Embedding Analysis
+
+Every P1 and P2 script includes a post-training analysis suite that measures:
+
+1. **Norm distributions** -- L2 norms of base vs new token embeddings, with Welch t-test, Mann-Whitney U, Cohen's d
+2. **Isotropy** -- Mu et al. 2018 partition function ratio. Measures how uniformly embeddings spread across the space
+3. **Embedding drift** -- cosine similarity between pre- and post-training embeddings. Base tokens should be ~1.0 (unchanged). Wake tokens should show meaningful movement
+4. **Nearest neighbors** -- for sampled Wake tokens, find 5 closest base vocab tokens by cosine similarity
+5. **Intrinsic dimensionality** -- PCA explained variance. How many principal components capture 90%/95% of variance in base vs new embeddings
+6. **Pairwise cosine similarity** -- distributions for (base,base), (new,new), (base,new) pairs with KS test
+
+All results saved as JSON + 6-panel matplotlib figure.
+---
+
+## Results So Far
+
+### TinyLlama P1 (complete)
+
+1,300 steps of embedding-only training. Loss went from 8.46 to 0.079 (99% reduction). Embeddings successfully integrated into the model's existing semantic space.
+
+### TinyLlama P2 (running, overfitting)
+
+| Step | Train | Val | Gap |
+|---|---|---|---|
+| 1200 | 0.5797 | 0.6255 | 0.046 |
+| 1400 | 0.6388 | 0.6393 | 0.001 |
+| 1600 | 0.5722 | 0.6460 | 0.074 |
+| 1800 | 0.6104 | 0.6594 | 0.049 |
+| 2000 | 0.4943 | 0.6679 | 0.174 |
+
+Val loss climbing monotonically since step 1200. Best checkpoint for generation is probably around step 1400-1600. Running to 3000 to see the full curve.
+
+### Llama 3.2-1B P1 (early)
+
+Step 400: train_loss=92.11 (logging artifact from lexicon-heavy batch), val_loss=7.58 (normal for this stage).
 
 ---
 
