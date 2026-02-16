@@ -4,6 +4,8 @@
 
 Fine-tune LLMs on *Finnegans Wake* by injecting ~45K Joyce-specific tokens into the embedding layer and training in two phases: embedding-only warm-up (P1) then LoRA adaptation (P2). Currently testing across TinyLlama 1.1B, Llama 3.2-1B, Llama 3.2-3B, and Llama 3.1-8B on free Colab T4 GPUs. The whole point is to see which model produces the best Wake-like output. This is very much a work in progress.
 
+[For when that T4 hits (connecting...)](https://soundcloud.com/houseof_kyri/sets/for-when-that-t4-hits?si=14377a8a628e46cda5971241e0547f5a&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing)
+
 ---
 
 ## Models
