@@ -64,9 +64,6 @@ print("=" * 60)
 torch.cuda.empty_cache()
 gc.collect()
 
-torch.cuda.empty_cache()
-gc.collect()
-
 from google.colab import drive
 drive.mount('/content/drive')
 
