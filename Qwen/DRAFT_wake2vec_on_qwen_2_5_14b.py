@@ -286,4 +286,224 @@ print(f"  Headroom: ~{vram_total - vram_after_setup:.1f} GB (for gradients + act
 if vram_total - vram_after_setup < 1.5:
     print("  ⚠ VRAM is VERY tight. if training OOMs, try SEQ_LEN=128")
 
-# Finish tomorrow 
+# pre-training snapshot 
+E_pre = wte.weight.detach().cpu().clone()
+torch.save(E_pre, RUN_DIR / "embeddings_pre.pt")
+print(f"  Pre-training snapshot saved: {E_pre.shape}")
+
+# callbacks 
+# (the paranoia suite: save everything everywhere all at once)
+import shutil, time
+from transformers import TrainerCallback
+
+def has_weights(ck):
+    return (ck / "adapter_model.safetensors").exists() or (ck / "pytorch_model.bin").exists()
+
+class EmbeddingSnapshot(TrainerCallback):
+    """save embeddings every N steps because colab is not to be trusted"""
+    def on_step_end(self, args, state, control, **kwargs):
+        if state.global_step > 0 and state.global_step % EMB_SNAP_STEPS == 0:
+            try:
+                torch.save(wte.weight.detach().cpu(),
+                           EMB_SNAPS / f"emb_step{state.global_step:04d}.pt")
+                os.sync()
+            except Exception as e:
+                print(f"[EMB] {e}")
+
+class FullCheckpoint(TrainerCallback):
+    """full model dump to Drive. belt AND suspenders."""
+    def on_save(self, args, state, control, **kwargs):
+        try:
+            step = state.global_step
+            full_ck = FULL_CHECKPOINTS / f"step_{step:04d}"
+            if full_ck.exists():
+                shutil.rmtree(full_ck)
+            full_ck.mkdir(parents=True, exist_ok=True)
+            model.save_pretrained(full_ck)
+            tok.save_pretrained(full_ck)
+            torch.save(wte.weight.detach().cpu(), full_ck / "embeddings.pt")
+            torch.save({'global_step': step, 'best_metric': state.best_metric,
+                        'epoch': state.epoch}, full_ck / "training_state.pt")
+            os.sync()
+            print(f"[FULL] Step {step}: saved to the cloud (trust the cloud)")
+        except Exception as e:
+            print(f"[FULL] {e}")
+
+class SentryMirror(TrainerCallback):
+    """mirror trainer checkpoints to Drive because local storage is ephemeral"""
+    def on_save(self, args, state, control, **kw):
+        try:
+            cks = sorted(LOCAL_RUN.glob("checkpoint-*"),
+                         key=lambda p: int(p.name.split("-")[-1]), reverse=True)
+            if not cks:
+                return
+            ck = cks[0]
+            if not has_weights(ck):
+                return
+            dst = SENTRY / ck.name
+            if dst.exists():
+                return
+            shutil.copytree(ck, dst)
+            os.sync()
+            print(f"[SENTRY] {ck.name}: safe on Drive")
+        except Exception as e:
+            print(f"[SENTRY] {e}")
+
+class LossMonitor(TrainerCallback):
+    """yell if train and eval diverge too much"""
+    def __init__(self):
+        self.last_train_loss = None
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if logs is None:
+            return
+        if "loss" in logs:
+            self.last_train_loss = logs["loss"]
+        if "eval_loss" in logs and self.last_train_loss is not None:
+            gap = logs["eval_loss"] - self.last_train_loss
+            if gap > 3.0:
+                print(f"[WARN] train/eval gap: {gap:.2f} — might be vibing too hard")
+
+class StepTimer(TrainerCallback):
+    """track how slow this absolute unit is"""
+    def __init__(self):
+        self.step_times = []
+        self.last_time = None
+    def on_step_end(self, args, state, control, **kw):
+        now = time.time()
+        if self.last_time is not None:
+            self.step_times.append(now - self.last_time)
+            if state.global_step % 10 == 0:
+                recent = self.step_times[-10:]
+                avg = sum(recent) / len(recent)
+                remaining = (MAX_STEPS - state.global_step) * avg / 60
+                print(f"[{state.global_step:4d}] {avg:.1f}s/step | ~{remaining:.0f}min remaining")
+        self.last_time = now
+
+# trainer 
+# (Adafactor because we cannot afford momentum states on this budget)
+from transformers import TrainingArguments, Trainer
+
+class EmbOnlyTrainer(Trainer):
+    """custom trainer: Adafactor on just the embedding weight.
+    no momentum = no extra memory = we live another day."""
+    def create_optimizer(self):
+        # critical for 14B on T4 where every MB counts
+        from transformers.optimization import Adafactor
+        if not hasattr(self, "optimizer") or self.optimizer is None:
+            self.optimizer = Adafactor(
+                [{"params": [wte.weight]}],
+                lr=LR,
+                scale_parameter=False,
+                relative_step=False,
+                warmup_init=False,
+            )
+        return self.optimizer
+
+    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+        out = model(**inputs, use_cache=False)
+        loss = out.loss
+        if torch.isnan(loss) or torch.isinf(loss):
+            raise RuntimeError("NaN/Inf loss — the void stares back")
+        return (loss, out) if return_outputs else loss
+
+args = TrainingArguments(
+    output_dir=str(LOCAL_RUN),
+    max_steps=MAX_STEPS,
+    per_device_train_batch_size=BATCH_SIZE,
+    per_device_eval_batch_size=BATCH_SIZE,
+    gradient_accumulation_steps=GRAD_ACCUM,
+    learning_rate=LR,
+    warmup_steps=WARMUP_STEPS,
+    lr_scheduler_type="cosine",
+    weight_decay=WEIGHT_DECAY,
+    fp16=False,
+    bf16=True,
+    logging_steps=LOG_STEPS,
+    save_steps=SAVE_STEPS,
+    save_total_limit=6,
+    eval_strategy="steps",
+    eval_steps=EVAL_STEPS,
+    report_to="none",
+    dataloader_pin_memory=False,
+    gradient_checkpointing=True,    # a need, a must 
+    max_grad_norm=1.0,
+)
+
+trainer = EmbOnlyTrainer(
+    model=model, args=args,
+    train_dataset=train_ds, eval_dataset=val_ds,
+    data_collator=None,
+    callbacks=[EmbeddingSnapshot(), FullCheckpoint(), SentryMirror(),
+               LossMonitor(), StepTimer()],
+)
+
+print("=" * 60)
+print("WAKE2VEC P1: Qwen2.5-14B EMBEDDING-ONLY")
+print("  (the biggest lad on free colab)")
+print("=" * 60)
+print(f"  Train: {len(train_ds)} blocks | Val: {len(val_ds)} blocks")
+print(f"  Steps: {MAX_STEPS} | Effective batch: {BATCH_SIZE * GRAD_ACCUM}")
+print(f"  New Wake tokens: {num_added} | Already in vocab: {already_known}")
+print(f"  VRAM before training: {torch.cuda.memory_allocated(0) / 1e9:.2f} GB")
+print(f"  Optimizer: Adafactor (no momentum, no mercy)")
+print("=" * 60)
+
+# train 
+# (to be or not to be innit)
+t0 = time.time()
+if RESUME_FROM is not None:
+    local_ckpt = LOCAL_RUN / RESUME_FROM.name
+    if not local_ckpt.exists():
+        shutil.copytree(RESUME_FROM, local_ckpt)
+    print(f"[RESUME] {RESUME_FROM.name} — welcome back, we missed you")
+    trainer.train(resume_from_checkpoint=str(local_ckpt))
+else:
+    trainer.train()
+elapsed = (time.time() - t0) / 60
+print(f"\nTRAINING COMPLETE ({elapsed:.1f} minutes)")
+print(f"that's {elapsed/60:.1f} hours of T4 time. you're welcome, google.")
+
+# save final 
+final_dir = RUN_DIR / "final"
+final_dir.mkdir(exist_ok=True)
+model.save_pretrained(str(final_dir))
+tok.save_pretrained(str(final_dir))
+final_emb = wte.weight.detach().cpu()
+torch.save(final_emb, final_dir / "embeddings.pt")
+os.sync()
+print(f"Final model saved to {final_dir}")
+
+# loss curve 
+import matplotlib.pyplot as plt
+import json
+
+state_files = list(LOCAL_RUN.rglob("trainer_state.json"))
+if state_files:
+    latest = max(state_files, key=lambda p: p.stat().st_mtime)
+    with open(latest) as f:
+        state = json.load(f)
+
+    logs = state.get("log_history", [])
+    train_data = [(d["step"], d["loss"]) for d in logs if "loss" in d and "eval_loss" not in d]
+    val_data = [(d["step"], d["eval_loss"]) for d in logs if "eval_loss" in d]
+
+    if train_data:
+        plt.figure(figsize=(12, 6))
+        steps, losses = zip(*train_data)
+        plt.plot(steps, losses, 'b-o', label='Train', alpha=0.7, markersize=4)
+        if val_data:
+            v_steps, v_losses = zip(*val_data)
+            plt.plot(v_steps, v_losses, 'r-s', label='Val', alpha=0.7, markersize=4)
+        plt.xlabel('Step'); plt.ylabel('Loss')
+        plt.title('Wake2Vec P1: Qwen2.5-14B Loss Curve (the big one)')
+        plt.legend(); plt.grid(True, alpha=0.3)
+        plot_path = RUN_DIR / "p1_qwen14b_loss_curve.png"
+        plt.savefig(plot_path, dpi=150, bbox_inches="tight")
+        print(f"Plot saved: {plot_path}")
+        plt.show()
+        print(f"\nFinal train loss: {losses[-1]:.4f}")
+        if val_data:
+            print(f"Final val loss: {v_losses[-1]:.4f}")
+            print(f"Best val loss: {min(v_losses):.4f}")
+
+  # let's see if this shit even runs before i worry about an analysis 
