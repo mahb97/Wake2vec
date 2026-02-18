@@ -8,7 +8,7 @@ Original file is located at
 """
 
 # ╔══════════════════════════════════════════════════════════════════╗
-# ║  wake2vec — Embedding Animation Pipeline                         ║
+# ║  wake2vec Embedding Animation Pipeline                           ║
 # ║  Watch 45K Wake tokens find their place in embedding space       ║
 # ║  "riverrun, past Eve and Adam's, from swerve of shore..."        ║
 # ╚══════════════════════════════════════════════════════════════════╝
@@ -35,7 +35,7 @@ import json
 from pathlib import Path
 from transformers import AutoTokenizer
 
-# paths (adjust if your Drive mount is different) ──
+# paths
 WAKE2VEC_ROOT = Path("/content/drive/MyDrive/wake2vec")
 SNAP_DIR      = Path("/content/drive/MyDrive/wake2vec_tiny_p1_fryembeds/emb_snaps")    # P1 snapshots
 LEXICON_PATH  = Path("/content/wake_lexicon.txt")
@@ -43,9 +43,9 @@ TOKENIZER_DIR = Path("/content/drive/MyDrive/wake2vec_tiny_p1_fryembeds/checkpoi
 OGDEN_PATH    = Path("/content/odgen_basic_full.txt")
 
 #config
-BASE_VOCAB   = 32000     # TinyLlama base vocab size (Wake tokens start here)
-N_SAMPLE     = 200       # how many Wake tokens to animate (keeps it readable)
-N_LANDMARKS  = 18        # how many Ogden's words as reference points
+BASE_VOCAB   = 32000     # TinyLlama base vocab size
+N_SAMPLE     = 200       # Wake tokens (random sample from lexicon)
+N_LANDMARKS  = 18        # Ogden's basic english words as reference points
 SEED         = 42        # for reproducible sampling
 TRAIL_LEN    = 5         # how many previous positions to show as trails
 OUTPUT_MP4   = WAKE2VEC_ROOT / "wake_embedding_animation.mp4"
@@ -69,7 +69,6 @@ with open(LEXICON_PATH, "r", encoding="utf-8") as f:
 print(f"Lexicon: {len(wake_words)} words")
 
 # map each wake word to its token ID
-# the tokenizer should have these as single tokens (they were added in P1)
 wake_word_to_id = {}
 failed = []
 for word in wake_words:
@@ -107,10 +106,9 @@ initial_sample_indices = rng.choice(len(all_wake_ids), size=num_wake_to_sample, 
 initial_sampled_wake_ids = [all_wake_ids[i] for i in initial_sample_indices]
 initial_sampled_wake_words = [all_wake_words_mapped[i] for i in initial_sample_indices]
 
-# sample 18 Ogden's landmarks (this part is fine as is)
+# sample 18 Ogden's landmarks
 with open(OGDEN_PATH, "r", encoding="utf-8") as f:
     ogden_raw = f.read()
-# ogden file uses \r as delimiter
 ogden_words = [w.strip() for w in ogden_raw.replace('\n', '\r').split('\r') if w.strip()]
 # filter to words that are single tokens in base vocab
 ogden_candidates = []
@@ -125,7 +123,7 @@ landmark_words = [ogden_candidates[i][0] for i in landmark_indices]
 landmark_ids = [ogden_candidates[i][1] for i in landmark_indices]
 print(f"Selected landmarks: {landmark_words}")
 
-# load all snapshots (moved this section up to get E.shape)
+# load all snapshots 
 snap_files = sorted(glob.glob(str(SNAP_DIR / "emb_step*.pt")))
 # extract step numbers and sort
 def get_step(path):
@@ -236,11 +234,11 @@ for ax, frame_idx, title in [(axes[0], 0, f"Step {step_numbers[0]} (initial)"),
     ax.set_facecolor('#0a0a0a')
     fig.patch.set_facecolor('#0a0a0a')
 
-    # wake tokens — bright cyan
+    # wake tokens, cyan
     ax.scatter(wake_2d[frame_idx, :, 0], wake_2d[frame_idx, :, 1],
                c='#00ffcc', s=12, alpha=0.7, zorder=3, label='Wake tokens')
 
-    # landmarks — gray with labels
+    # landmarks, grey
     ax.scatter(landmark_2d[frame_idx, :, 0], landmark_2d[frame_idx, :, 1],
                c='#888888', s=40, alpha=0.9, zorder=4, marker='s', label='Ogden\'s landmarks')
     for j, word in enumerate(landmark_words):
@@ -288,7 +286,7 @@ for spine in ax.spines.values():
 # title
 title_text = ax.set_title("", color='white', fontsize=14, fontweight='bold', pad=10)
 
-# landmark scatter (static-ish, they barely move)
+# landmark scatter 
 land_scatter = ax.scatter([], [], c='#888888', s=40, alpha=0.9, zorder=4, marker='s')
 land_labels = []
 for j, word in enumerate(landmark_words):
@@ -508,7 +506,7 @@ except Exception as e:
 # Summary Stats
 print("\n── Summary Statistics ──")
 
-# total displacement per wake token (L2 norm of final - initial)
+# total displacement per wake token 
 displacement = np.linalg.norm(wake_2d[-1] - wake_2d[0], axis=1)
 
 print(f"\nDisplacement (2D PCA space):")
