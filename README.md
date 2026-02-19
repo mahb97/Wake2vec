@@ -277,33 +277,14 @@ All transformer layers frozen. Only the tied embedding matrix was trained.
 
 > theshade of ages (our times are done) with theirhistoricbringing them.
 > Those were the
-
-### [1 cont.] MPM
-
 > Homo Vestrae, Vale, O'Neill!
-
-### [2]
-
 > Theheart of Lifé, the year of the Cure,
-
-### [3]
-
 > Fought for Humans' mound in Peruvian:
-
-### [4]
-
 > _Ere_ I go to quest of Wachtman's Cromwell,
->
-> [265]
 > high time as far as Tear-nan-Og,
 > as far as the Oyest Brayles;
 
-### [5]
-
 > The
-
-### [6]
-
 > butwhere is he? Tell me, why do we be on of thatclass?
 > Why not at the Rother's stomach? If she can't keep him at lughts or
 > forshee Chambers? Not then? without the having to be off tobridges,through
