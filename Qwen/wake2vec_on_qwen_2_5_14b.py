@@ -27,7 +27,9 @@ riverrun.
 # os.kill(os.getpid(), 9)
 
 # housekeeping 
-!pip install bitsandbytes==0.45.0 --force-reinstall --no-cache-dir
+# !pip install bitsandbytes==0.43.3 --force-reinstall --no-cache-dir
+!pip install torch==2.9.0+cu126 torchaudio==2.9.0+cu126 torchvision==0.24.0+cu126 --index-url https://download.pytorch.org/whl/cu126
+!pip install bitsandbytes==0.45.0 peft==0.18.1 accelerate==1.12.0
 
 # envi
 # (pip install is a creative act)
@@ -35,31 +37,19 @@ import os
 os.environ["TRANSFORMERS_NO_TORCHAO"] = "1"
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-import subprocess, sys
-subprocess.check_call([sys.executable, "-m", "pip", "install", "-q",
-                       "bitsandbytes==0.45.0", "scikit-learn", "scipy"])
-
-!pip install torch==2.9.0+cu126 --index-url https://download.pytorch.org/whl/cu126
-!pip install bitsandbytes==0.45.0
-
 import torch, gc
-print("=" * 60)
-print("ENVIRONMENT (pray for VRAM)")
-print("=" * 60)
 print(f"torch: {torch.__version__} | cuda: {torch.version.cuda}")
-try:
-    import bitsandbytes as bnb_lib
-    print(f"bitsandbytes: {bnb_lib.__version__}")
-except ImportError:
-    print("bitsandbytes: NOT INSTALLED — we're cooked")
+
+import bitsandbytes as bnb_lib
+print(f"bitsandbytes: {bnb_lib.__version__}")
+
 import transformers, accelerate, peft
 print(f"transformers: {transformers.__version__}")
 print(f"accelerate: {accelerate.__version__}")
 print(f"peft: {peft.__version__}")
 print(f"GPU: {torch.cuda.get_device_name(0)}")
 vram_total = torch.cuda.get_device_properties(0).total_memory / 1e9
-print(f"VRAM: {vram_total:.2f} GB {'(gaslight GPU energy)' if vram_total < 16 else ''}")
-print("=" * 60)
+print(f"VRAM: {vram_total:.2f} GB")
 
 torch.cuda.empty_cache()
 gc.collect()
@@ -69,7 +59,6 @@ drive.mount('/content/drive')
 
 from huggingface_hub import login
 login()
-
 
 # config
 # (do the math and hope)
