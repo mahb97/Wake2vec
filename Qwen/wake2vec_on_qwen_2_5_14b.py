@@ -25,6 +25,7 @@ riverrun.
 
 # import os
 # os.kill(os.getpid(), 9)
+
 # housekeeping 
 !pip install bitsandbytes==0.45.0 --force-reinstall --no-cache-dir
 
@@ -37,6 +38,9 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 import subprocess, sys
 subprocess.check_call([sys.executable, "-m", "pip", "install", "-q",
                        "bitsandbytes==0.45.0", "scikit-learn", "scipy"])
+
+!pip install torch==2.9.0+cu126 --index-url https://download.pytorch.org/whl/cu126
+!pip install bitsandbytes==0.45.0
 
 import torch, gc
 print("=" * 60)
