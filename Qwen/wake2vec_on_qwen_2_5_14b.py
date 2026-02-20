@@ -23,6 +23,11 @@ reminder: the Wake never ends. it just loops back to the beginning.
 riverrun.
 """
 
+# import os
+# os.kill(os.getpid(), 9)
+# housekeeping 
+!pip install bitsandbytes==0.45.0 --force-reinstall --no-cache-dir
+
 # envi
 # (pip install is a creative act)
 import os
