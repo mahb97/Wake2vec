@@ -31,7 +31,7 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 import subprocess, sys
 subprocess.check_call([sys.executable, "-m", "pip", "install", "-q",
-                       "bitsandbytes", "scikit-learn", "scipy"])
+                       "bitsandbytes==0.45.0", "scikit-learn", "scipy"])
 
 import torch, gc
 print("=" * 60)
