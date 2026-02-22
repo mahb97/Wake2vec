@@ -22,14 +22,22 @@ If it STILL OOMs: skill issue (on Colab's part, not yours).
 reminder: the Wake never ends. it just loops back to the beginning.
 riverrun.
 """
+# use as needed
+
+# gpu flush
+# import torch, gc
+# gc.collect()
+# torch.cuda.empty_cache()
+# torch.cuda.reset_peak_memory_stats()
+# print(f"GPU: {torch.cuda.memory_allocated(0)/1e9:.2f} GB allocated")
+# print(f"     {torch.cuda.memory_reserved(0)/1e9:.2f} GB reserved")
 
 # import os
 # os.kill(os.getpid(), 9)
 
 # housekeeping 
 # !pip install bitsandbytes==0.43.3 --force-reinstall --no-cache-dir
-!pip install torch==2.9.0+cu126 torchaudio==2.9.0+cu126 torchvision==0.24.0+cu126 --index-url https://download.pytorch.org/whl/cu126
-!pip install bitsandbytes==0.45.0 peft==0.18.1 accelerate==1.12.0
+!pip install torch==2.9.0+cu126 torchaudio==2.9.0+cu126 torchvision==0.24.0+cu126 --index-url https://download.pytorch.org/whl/cu126 && pip install bitsandbytes==0.45.0 peft==0.18.1 accelerate==1.12.0 --force-reinstall --no-deps
 
 # envi
 # (pip install is a creative act)
@@ -39,6 +47,16 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 import torch, gc
 print(f"torch: {torch.__version__} | cuda: {torch.version.cuda}")
+
+import sys, types
+
+# Fake triton.ops for bnb 0.45.0 on triton 3.x
+fake_perf = types.ModuleType('triton.ops.matmul_perf_model')
+fake_perf.early_config_prune = lambda *a, **k: []
+fake_perf.estimate_matmul_time = lambda *a, **k: 0
+
+sys.modules['triton.ops'] = types.ModuleType('triton.ops')
+sys.modules['triton.ops.matmul_perf_model'] = fake_perf
 
 import bitsandbytes as bnb_lib
 print(f"bitsandbytes: {bnb_lib.__version__}")
@@ -50,6 +68,27 @@ print(f"peft: {peft.__version__}")
 print(f"GPU: {torch.cuda.get_device_name(0)}")
 vram_total = torch.cuda.get_device_properties(0).total_memory / 1e9
 print(f"VRAM: {vram_total:.2f} GB")
+
+torch.cuda.empty_cache()
+gc.collect()
+
+print("=" * 60)
+print("ENVIRONMENT (pray for VRAM)")
+print("=" * 60)
+print(f"torch: {torch.__version__} | cuda: {torch.version.cuda}")
+try:
+    import bitsandbytes as bnb_lib
+    print(f"bitsandbytes: {bnb_lib.__version__}")
+except ImportError:
+    print("bitsandbytes: NOT INSTALLED — we're cooked")
+import transformers, accelerate, peft
+print(f"transformers: {transformers.__version__}")
+print(f"accelerate: {accelerate.__version__}")
+print(f"peft: {peft.__version__}")
+print(f"GPU: {torch.cuda.get_device_name(0)}")
+vram_total = torch.cuda.get_device_properties(0).total_memory / 1e9
+print(f"VRAM: {vram_total:.2f} GB {'(gaslight GPU energy)' if vram_total < 16 else ''}")
+print("=" * 60)
 
 torch.cuda.empty_cache()
 gc.collect()
@@ -86,7 +125,7 @@ WARMUP_STEPS = max(20, MAX_STEPS // 20)  # 5% warmup
 WEIGHT_DECAY = 0.0
 BATCH_SIZE = 1
 GRAD_ACCUM = 16              # effective batch 16, same as everyone else
-SEQ_LEN = 256                # might need to drop to 128 if OOM
+SEQ_LEN = 128               # was 256 but OOM on backward pass 
 SAVE_STEPS = 50              # colab disconnect PTSD
 LOG_STEPS = 50
 EVAL_STEPS = 200
@@ -232,57 +271,65 @@ model = get_peft_model(model, peft_cfg)
 for n, p in model.named_parameters():
     p.requires_grad = False
 
-# wake embed injection 
-# (spherical init: random directions, radius matched to base vocab norms)
-old_vocab = model.get_input_embeddings().weight.shape[0]
-model.resize_token_embeddings(TOTAL_VOCAB)
+# Wake overlay
+import torch, math
+import torch.nn as nn
+
+wake_start = BASE_VOCAB  # 152064
+actual_wake_count = TOTAL_VOCAB - wake_start  # 43824
+
+model.resize_token_embeddings(TOTAL_VOCAB, mean_resizing=False)
 wte = model.get_input_embeddings()
+wte.weight.data = wte.weight.data.half()
 
-# tie output embeddings
-if hasattr(model, "lm_head"):
-    model.lm_head.weight = wte.weight
-
+# Spherical init for Wake region
 with torch.no_grad():
-    base = wte.weight[:old_vocab]
+    base = wte.weight[:wake_start]
     dim = base.shape[1]
     std = base.std().item()
     base_radius = std * math.sqrt(dim)
     target_radius = 1.5 * base_radius
 
-    if num_added > 0:
-        # spherical init: random direction, fixed magnitude. each new token starts at a unique point on a hypersphere
-        new = torch.randn((num_added, dim), device=wte.weight.device)
-        new = new / (new.norm(dim=1, keepdim=True) + 1e-8) * target_radius
-        wte.weight.data[old_vocab:old_vocab + num_added] = new
+    new = torch.randn((actual_wake_count, dim), device=wte.weight.device, dtype=torch.float16)
+    new = new / (new.norm(dim=1, keepdim=True) + 1e-8) * target_radius
+    wte.weight.data[wake_start:TOTAL_VOCAB] = new
 
-print(f"  Vocab: {old_vocab} -> {TOTAL_VOCAB} (+{num_added} new Wake tokens)")
-print(f"  Spherical init radius: {target_radius:.4f}")
-print(f"  Embedding dim: {dim}")
+# FREEZE the full embedding — no 1.87 GB gradient
+wte.weight.requires_grad = False
 
-# make embedding trainable, mask base rows
-wte.weight.requires_grad = True
+# Small trainable overlay for Wake tokens only
+class WakeOverlay(nn.Module):
+    def __init__(self, full_embed, start, count):
+        super().__init__()
+        self.full_embed = full_embed
+        self.start = start
+        self.end = start + count
+        # Trainable: just the Wake rows, copied from the initialized values
+        self.wake_embed = nn.Embedding(count, full_embed.embedding_dim)
+        self.wake_embed.weight.data = full_embed.weight.data[start:start+count].clone().float()
 
-new_rows = torch.arange(old_vocab, old_vocab + num_added, device=wte.weight.device) if num_added > 0 else None
-base_rows_idx = torch.arange(0, old_vocab, device=wte.weight.device)
+    def forward(self, input_ids):
+        # Base lookup (frozen, no gradient)
+        base_out = self.full_embed(input_ids)
+        # Find Wake tokens in this batch
+        mask = (input_ids >= self.start) & (input_ids < self.end)
+        if mask.any():
+            wake_ids = input_ids[mask] - self.start
+            base_out[mask] = self.wake_embed(wake_ids).to(base_out.dtype)
+        return base_out
 
-def mask_grad(grad):
-    """zero gradients for all base vocab rows.
-    only the new wake tokens learn. the OGs stay put."""
-    if grad is None or new_rows is None:
-        return grad
-    grad[base_rows_idx] = 0
-    return grad
+overlay = WakeOverlay(wte, wake_start, actual_wake_count)
+model.set_input_embeddings(overlay)
 
-wte.weight.register_hook(mask_grad)
+# Tie lm_head to the full weight (frozen, that's fine)
+if hasattr(model, "lm_head"):
+    model.lm_head.weight = wte.weight
 
 trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-vram_after_setup = torch.cuda.memory_allocated(0) / 1e9
-print(f"  Trainable params: {trainable:,}")
-print(f"  VRAM after setup: {vram_after_setup:.2f} GB")
-print(f"  Headroom: ~{vram_total - vram_after_setup:.1f} GB (for gradients + activations)")
-
-if vram_total - vram_after_setup < 1.5:
-    print("  ⚠ VRAM is VERY tight. if training OOMs, try SEQ_LEN=128")
+print(f"Wake overlay: {actual_wake_count} tokens, fp32, {actual_wake_count*5120*4/1e9:.2f} GB")
+print(f"Trainable params: {trainable:,}")
+print(f"VRAM: {torch.cuda.memory_allocated(0)/1e9:.2f} GB")
+print(f"Headroom: {vram_total - torch.cuda.memory_allocated(0)/1e9:.1f} GB")
 
 # pre-training snapshot 
 E_pre = wte.weight.detach().cpu().clone()
