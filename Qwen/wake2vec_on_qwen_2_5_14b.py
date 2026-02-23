@@ -130,10 +130,10 @@ WEIGHT_DECAY = 0.0
 BATCH_SIZE = 1
 GRAD_ACCUM = 16              # effective batch 16, same as everyone else
 SEQ_LEN = 128               # was 256 but OOM on backward pass 
-SAVE_STEPS = 50              # colab disconnect PTSD
-LOG_STEPS = 50
-EVAL_STEPS = 200
-EMB_SNAP_STEPS = 50
+SAVE_STEPS = 20              # colab disconnect PTSD
+LOG_STEPS = 20
+EVAL_STEPS = 50
+EMB_SNAP_STEPS = 20
 
 RESUME_FROM = None
 # RESUME_FROM = SENTRY / "checkpoint-200"   # uncomment when gaslight GPU strikes
