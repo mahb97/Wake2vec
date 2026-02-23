@@ -424,6 +424,24 @@ class StepTimer(TrainerCallback):
                 print(f"[{state.global_step:4d}] {avg:.1f}s/step | ~{remaining:.0f}min remaining")
         self.last_time = now
 
+# patch 
+import accelerate.accelerator as _acc
+_orig_prepare = _acc.Accelerator.prepare_model
+def _hacked_prepare(self, model, device_placement=None, evaluation_mode=False):
+    # Skip the 4-bit + CPU offload check
+    self._models.append(model)
+    return model
+_acc.Accelerator.prepare_model = _hacked_prepare
+
+wte = model.get_input_embeddings()
+print(f"Full embed dtype: {wte.full_embed.weight.dtype}")
+print(f"Full embed shape: {wte.full_embed.weight.shape}")
+print(f"Wake overlay dtype: {wte.wake_embed.weight.dtype}")
+print(f"Wake overlay shape: {wte.wake_embed.weight.shape}")
+print(f"Wake overlay size: {wte.wake_embed.weight.nelement() * wte.wake_embed.weight.element_size() / 1e9:.2f} GB")
+
+# probs best to run the GPU flush cell once before starting trainer. just to be safe. 
+
 # trainer 
 # (Adafactor because we cannot afford momentum states on this budget)
 from transformers import TrainingArguments, Trainer
@@ -436,7 +454,7 @@ class EmbOnlyTrainer(Trainer):
         from transformers.optimization import Adafactor
         if not hasattr(self, "optimizer") or self.optimizer is None:
             self.optimizer = Adafactor(
-                [{"params": [wte.weight]}],
+                 [{"params": [wte.wake_embed.weight]}],
                 lr=LR,
                 scale_parameter=False,
                 relative_step=False,
