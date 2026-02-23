@@ -313,14 +313,16 @@ class WakeOverlay(nn.Module):
         self.wake_embed.weight.data = full_embed.weight.data[start:start+count].clone().float()
 
     def forward(self, input_ids):
-        # Base lookup (frozen, no gradient)
+    # Base lookup (frozen, no gradient)
         base_out = self.full_embed(input_ids)
-        # Find Wake tokens in this batch
+    # Find Wake tokens in this batch
         mask = (input_ids >= self.start) & (input_ids < self.end)
-        if mask.any():
-            wake_ids = input_ids[mask] - self.start
-            base_out[mask] = self.wake_embed(wake_ids).to(base_out.dtype)
-        return base_out
+    # Always compute wake_out to keep grad graph alive
+    # (non-wake positions get clamped to index 0 but won't be selected)
+        wake_ids = (input_ids - self.start).clamp(min=0, max=self.wake_embed.num_embeddings - 1)
+        wake_out = self.wake_embed(wake_ids).to(base_out.dtype)
+        mask_expanded = mask.unsqueeze(-1).expand_as(base_out)
+        return torch.where(mask_expanded, wake_out, base_out)
 
 overlay = WakeOverlay(wte, wake_start, actual_wake_count)
 model.set_input_embeddings(overlay)
