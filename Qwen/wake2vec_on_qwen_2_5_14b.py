@@ -352,11 +352,10 @@ def has_weights(ck):
     return (ck / "adapter_model.safetensors").exists() or (ck / "pytorch_model.bin").exists()
 
 class EmbeddingSnapshot(TrainerCallback):
-    """save embeddings every N steps because colab is not to be trusted"""
     def on_step_end(self, args, state, control, **kwargs):
         if state.global_step > 0 and state.global_step % EMB_SNAP_STEPS == 0:
             try:
-                torch.save(wte.weight.detach().cpu(),
+                torch.save(wte.wake_embed.weight.detach().cpu(),
                            EMB_SNAPS / f"emb_step{state.global_step:04d}.pt")
                 os.sync()
             except Exception as e:
