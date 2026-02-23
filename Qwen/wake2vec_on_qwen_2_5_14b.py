@@ -1,26 +1,30 @@
 # -*- coding: utf-8 -*-
 """wake2vec_on_qwen_2_5_14b.py
 
-# Wake2Vec P1: Qwen2.5-14B Embedding-Only with Gradient Masking
+# Wake2Vec P1: Qwen2.5-14B Embedding-Only with WakeOverlay
 
-**Model:** Qwen/Qwen2.5-14B (4-bit quantized body, fp32 embeddings)
-**Hardware:** Google Colab T4 GPU (15GB VRAM) — living on the edge
+**Model:** Qwen/Qwen2.5-14B (4-bit quantized body, fp16 frozen embeddings, fp32 Wake overlay)
+**Hardware:** Google Colab T4 GPU (15GB VRAM) computing in the margins 
 **Training data:** Finnegans Wake corpus + Wake lexicon
 
-The absolute unit. 14B params, 48 layers, 5120 hidden dim, 152K base vocab.
+The Qween. 14B params, 48 layers, 5120 hidden dim, 152K base vocab.
 This is the biggest model that can theoretically fit on a free T4 at 4-bit.
 VRAM budget is EXTREMELY tight (~12-13GB) so every byte counts.
 
-The fun part: Qwen already has a 152K vocab, so a lot of Wake neologisms
-might already be in there. We're adding 44,989 Wake tokens but many will
-be dupes. Less embedding disruption than TinyLlama's 140% vocab expansion.
+The fun part: Qwen already has a 152K vocab, so 767 Wake neologisms
+are already in there. Adding 43,824 new Wake tokens via WakeOverlay which is essentially
+a separate nn.Embedding that only allocates gradients for Wake rows
+(0.86 GB instead of 1.87 GB for the full matrix). This is how we fit.
 
-If this OOMs, try: seq_len 256->128, or batch 1->1 with grad_accum 16->32.
-If it STILL OOMs: skill issue (on Colab's part, not yours).
+Also required: triton.ops shim (bnb 0.45.0 vs triton 3.x),
+mean_resizing=False (OOM on covariance matrix), accelerate monkey-patch
+(4-bit + CPU offload training), and fp16 base embeddings (3.8→2.0 GB).
 
+Five rounds of OOM debugging. Five. But the Qween reigns.
 ────────────────────────────────────────────────────────────
 reminder: the Wake never ends. it just loops back to the beginning.
 riverrun.
+
 """
 # use as needed
 
