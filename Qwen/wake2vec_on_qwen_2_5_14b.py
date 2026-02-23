@@ -338,6 +338,7 @@ print(f"VRAM: {torch.cuda.memory_allocated(0)/1e9:.2f} GB")
 print(f"Headroom: {vram_total - torch.cuda.memory_allocated(0)/1e9:.1f} GB")
 
 # pre-training snapshot 
+wte = model.get_input_embeddings()
 E_pre = wte.wake_embed.weight.detach().cpu().clone()
 torch.save(E_pre, RUN_DIR / "embeddings_pre.pt")
 print(f"  Pre-training snapshot saved: {E_pre.shape}")
