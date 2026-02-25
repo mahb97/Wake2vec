@@ -350,17 +350,15 @@ from transformers import TrainerCallback
 
 def has_weights(ck):
     return (ck / "adapter_model.safetensors").exists() or (ck / "pytorch_model.bin").exists()
-
 class EmbeddingSnapshot(TrainerCallback):
     def on_step_end(self, args, state, control, **kwargs):
         if state.global_step > 0 and state.global_step % EMB_SNAP_STEPS == 0:
             try:
                 torch.save(wte.wake_embed.weight.detach().cpu(),
-                           EMB_SNAPS / f"emb_step{state.global_step:04d}.pt")
-                os.sync()
+                           LOCAL_RUN / f"emb_step{state.global_step:04d}.pt")
             except Exception as e:
                 print(f"[EMB] {e}")
-                
+
 class FullCheckpoint(TrainerCallback):
     """full model dump to Drive. belt AND suspenders."""
     def on_save(self, args, state, control, **kwargs):
@@ -375,7 +373,6 @@ class FullCheckpoint(TrainerCallback):
             torch.save(wte.wake_embed.weight.detach().cpu(), full_ck / "embeddings.pt")
             torch.save({'global_step': step, 'best_metric': state.best_metric,
                         'epoch': state.epoch}, full_ck / "training_state.pt")
-            os.sync()
             print(f"[FULL] Step {step}: saved to the cloud (trust the cloud)")
         except Exception as e:
             print(f"[FULL] {e}")
