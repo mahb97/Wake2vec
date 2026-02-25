@@ -360,7 +360,7 @@ class EmbeddingSnapshot(TrainerCallback):
                 os.sync()
             except Exception as e:
                 print(f"[EMB] {e}")
-
+                
 class FullCheckpoint(TrainerCallback):
     """full model dump to Drive. belt AND suspenders."""
     def on_save(self, args, state, control, **kwargs):
@@ -372,7 +372,7 @@ class FullCheckpoint(TrainerCallback):
             full_ck.mkdir(parents=True, exist_ok=True)
             model.save_pretrained(full_ck)
             tok.save_pretrained(full_ck)
-            torch.save(wte.weight.detach().cpu(), full_ck / "embeddings.pt")
+            torch.save(wte.wake_embed.weight.detach().cpu(), full_ck / "embeddings.pt")
             torch.save({'global_step': step, 'best_metric': state.best_metric,
                         'epoch': state.epoch}, full_ck / "training_state.pt")
             os.sync()
@@ -389,12 +389,13 @@ class SentryMirror(TrainerCallback):
             if not cks:
                 return
             ck = cks[0]
-            if not has_weights(ck):
-                return
             dst = SENTRY / ck.name
             if dst.exists():
                 return
             shutil.copytree(ck, dst)
+            # Also save Wake overlay weights separately
+            torch.save(wte.wake_embed.weight.detach().cpu(),
+                       dst / "wake_overlay.pt")
             os.sync()
             print(f"[SENTRY] {ck.name}: safe on Drive")
         except Exception as e:
