@@ -100,3 +100,5 @@ The morpheme groups encode *morphological* identity, not *syntactic* function. T
 
 For the paper: most NLP work on neologisms uses rule-based or statistical affix stripping. Having manually verified morpheme decompositions for 6,048 Wakean words and cross-referenced them against a standard lexicographic reference is technically a dataset contribution in its own right. The device classifications add a second annotation layer (creative strategy) that doesn't exist in any other FW resource we're aware of.
 
+More Flume for you: [Easy Goodbye](https://soundcloud.com/flume/easy-goodbye?in=houseof_kyri/sets/blanchardstown&si=b6617db9670e46768a52d2bd2c26f573&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing)
+
