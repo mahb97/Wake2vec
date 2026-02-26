@@ -1,22 +1,22 @@
-# Core - pinned for Nov 2025 Colab compatibility
-torch==2.5.1+cu121
-transformers==4.45.2
-accelerate==0.34.2
+# Core for Feb 2026 Colab compatibility
+# NOTE: Colab's default is torch 2.9.0+cu126. Pin exactly to avoid drift.
+torch==2.9.0+cu126
+torchaudio==2.9.0+cu126
+torchvision==0.24.0+cu126
+transformers>=4.45.2
+accelerate==1.12.0
 datasets
 tokenizers>=0.15
 safetensors
 scikit-learn
 
-# Quantization (optional, for Llama)
-bitsandbytes==0.43.3
-triton==3.1.0
+# Quantization
+# NOTE: bnb 0.45.0 still imports triton.ops which was removed in triton 3.x
+# (ships with torch 2.9). Requires triton shim in code — see DEVLOG_0220_QWEN.
+bitsandbytes==0.45.0
 
-# PEFT (optional, for P2 LoRA)
-peft==0.13.2
-
-# Finetuning / PEFT (optional but used in repo)
-peft>=0.11
-bitsandbytes>=0.43; platform_system!="Windows"
+# PEFT (LoRA for P2, dummy r=1 shim for Qwen P1)
+peft==0.18.1
 
 # Metrics / analysis / viz
 scikit-learn
@@ -27,6 +27,7 @@ Unidecode
 matplotlib
 numpy
 pandas
+scipy
 
 # Optional quality-of-life
 tqdm
