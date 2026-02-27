@@ -499,17 +499,10 @@ print("=" * 60)
 # train 
 # (to be or not to be innit)
 t0 = time.time()
-if RESUME_FROM is not None:
-    local_ckpt = LOCAL_RUN / RESUME_FROM.name
-    if not local_ckpt.exists():
-        shutil.copytree(RESUME_FROM, local_ckpt)
-    print(f"[RESUME] {RESUME_FROM.name} — welcome back, we missed you")
-    trainer.train(resume_from_checkpoint=str(local_ckpt))
-else:
-    trainer.train()
+trainer.train()
 elapsed = (time.time() - t0) / 60
 print(f"\nTRAINING COMPLETE ({elapsed:.1f} minutes)")
-print(f"that's {elapsed/60:.1f} hours of T4 time. you're welcome, google.")
+print(f"that's {elapsed/60:.1f} hours of T4 time.")
 
 # save final 
 final_dir = RUN_DIR / "final"
