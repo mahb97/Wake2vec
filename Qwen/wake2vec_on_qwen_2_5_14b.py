@@ -117,10 +117,8 @@ WAKE_LEXICON = "/content/wake_lexicon.txt"
 RUN_DIR = Path("/content/drive/MyDrive/wake2vec_qwen14b_p1")
 LOCAL_RUN = Path("/content/runs/wake2vec_qwen14b_p1")
 SENTRY = RUN_DIR / "sentry_backups"
-EMB_SNAPS = RUN_DIR / "emb_snaps"
-FULL_CHECKPOINTS = RUN_DIR / "full_checkpoints"
 
-for d in [RUN_DIR, LOCAL_RUN, SENTRY, EMB_SNAPS, FULL_CHECKPOINTS]:
+for d in [RUN_DIR, LOCAL_RUN, SENTRY]:
     d.mkdir(parents=True, exist_ok=True)
 
 MAX_STEPS = 3000
@@ -344,57 +342,40 @@ torch.save(E_pre, RUN_DIR / "embeddings_pre.pt")
 print(f"  Pre-training snapshot saved: {E_pre.shape}")
 
 # callbacks 
-# (the paranoia suite: save everything everywhere all at once)
-import shutil, time
+# save only the trainable embeddings to Drive (~215MB fp16).
+import time
 from transformers import TrainerCallback
 
-def has_weights(ck):
-    return (ck / "adapter_model.safetensors").exists() or (ck / "pytorch_model.bin").exists()
 class EmbeddingSnapshot(TrainerCallback):
+    """local breadcrumb trail"""
     def on_step_end(self, args, state, control, **kwargs):
         if state.global_step > 0 and state.global_step % EMB_SNAP_STEPS == 0:
             try:
-                torch.save(wte.wake_embed.weight.detach().cpu(),
-                           LOCAL_RUN / f"emb_step{state.global_step:04d}.pt")
+                emb = wte.wake_embed.weight.data[old_vocab:].detach().cpu()
+                torch.save(emb, LOCAL_RUN / f"emb_step{state.global_step:04d}.pt")
+                print(f"[EMB] step {state.global_step}: local snapshot ({emb.shape[0]} tokens)")
             except Exception as e:
                 print(f"[EMB] {e}")
 
-class FullCheckpoint(TrainerCallback):
-    """full model dump to Drive. belt AND suspenders."""
-    def on_save(self, args, state, control, **kwargs):
-        try:
-            step = state.global_step
-            full_ck = FULL_CHECKPOINTS / f"step_{step:04d}"
-            if full_ck.exists():
-                shutil.rmtree(full_ck)
-            full_ck.mkdir(parents=True, exist_ok=True)
-            model.save_pretrained(full_ck)
-            tok.save_pretrained(full_ck)
-            torch.save(wte.wake_embed.weight.detach().cpu(), full_ck / "embeddings.pt")
-            torch.save({'global_step': step, 'best_metric': state.best_metric,
-                        'epoch': state.epoch}, full_ck / "training_state.pt")
-            print(f"[FULL] Step {step}: saved to the cloud (trust the cloud)")
-        except Exception as e:
-            print(f"[FULL] {e}")
-
-class SentryMirror(TrainerCallback):
-    """mirror trainer checkpoints to Drive because local storage is ephemeral"""
+class DriveSentry(TrainerCallback):
+    """lightweight Drive backup"""
     def on_save(self, args, state, control, **kw):
         try:
-            cks = sorted(LOCAL_RUN.glob("checkpoint-*"),
-                         key=lambda p: int(p.name.split("-")[-1]), reverse=True)
-            if not cks:
-                return
-            ck = cks[0]
-            dst = SENTRY / ck.name
+            step = state.global_step
+            dst = SENTRY / f"sentry_step_{step:04d}.pt"
             if dst.exists():
                 return
-            shutil.copytree(ck, dst)
-            # Also save Wake overlay weights separately
-            torch.save(wte.wake_embed.weight.detach().cpu(),
-                       dst / "wake_overlay.pt")
-            os.sync()
-            print(f"[SENTRY] {ck.name}: safe on Drive")
+            emb = wte.wake_embed.weight.data[old_vocab:].detach().cpu().half()
+            torch.save({
+                'embeddings': emb,
+                'step': step,
+                'best_metric': state.best_metric,
+                'epoch': state.epoch,
+                'old_vocab': old_vocab,
+                'num_added': num_added,
+            }, dst)
+            size_mb = dst.stat().st_size / (1024 * 1024)
+            print(f"[SENTRY] step {step}: {size_mb:.0f}MB to Drive (embeddings only)")
         except Exception as e:
             print(f"[SENTRY] {e}")
 
@@ -413,7 +394,7 @@ class LossMonitor(TrainerCallback):
                 print(f"[WARN] train/eval gap: {gap:.2f} — might be vibing too hard")
 
 class StepTimer(TrainerCallback):
-    """track how slow this absolute unit is"""
+    """track how slow Qween is"""
     def __init__(self):
         self.step_times = []
         self.last_time = None
@@ -500,13 +481,13 @@ trainer = EmbOnlyTrainer(
     model=model, args=args,
     train_dataset=train_ds, eval_dataset=val_ds,
     data_collator=None,
-    callbacks=[EmbeddingSnapshot(), FullCheckpoint(), SentryMirror(),
+    callbacks=[EmbeddingSnapshot(), DriveSentry(),
                LossMonitor(), StepTimer()],
 )
 
 print("=" * 60)
 print("WAKE2VEC P1: Qwen2.5-14B EMBEDDING-ONLY")
-print("  (the biggest lad on free colab)")
+print("  (the biggest qween on free colab)")
 print("=" * 60)
 print(f"  Train: {len(train_ds)} blocks | Val: {len(val_ds)} blocks")
 print(f"  Steps: {MAX_STEPS} | Effective batch: {BATCH_SIZE * GRAD_ACCUM}")
