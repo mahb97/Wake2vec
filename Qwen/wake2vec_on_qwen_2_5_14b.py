@@ -523,9 +523,8 @@ final_dir = RUN_DIR / "final"
 final_dir.mkdir(exist_ok=True)
 model.save_pretrained(str(final_dir))
 tok.save_pretrained(str(final_dir))
-final_emb = wte.weight.detach().cpu()
+final_emb = overlay.wake_embed.weight.detach().cpu()
 torch.save(final_emb, final_dir / "embeddings.pt")
-os.sync()
 print(f"Final model saved to {final_dir}")
 
 # loss curve 
