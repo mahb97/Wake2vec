@@ -340,33 +340,36 @@ wte = model.get_input_embeddings()
 E_pre = wte.wake_embed.weight.detach().cpu().clone()
 torch.save(E_pre, RUN_DIR / "embeddings_pre.pt")
 print(f"  Pre-training snapshot saved: {E_pre.shape}")
+
 # callbacks
 # Strategy: save ONLY the trainable embeddings to Drive (~215MB fp16).
 import time
 from transformers import TrainerCallback
 
 class EmbeddingSnapshot(TrainerCallback):
-    """local breadcrumb trail."""
-    def __init__(self, wake_embed, old_vocab, local_run, snap_steps):
+    """local breadcrumb trail: save wake embeddings every N steps.
+    fast because it's local SSD, not Drive."""
+    def __init__(self, wake_embed, local_run, snap_steps):
         self.wake_embed = wake_embed
-        self.old_vocab = old_vocab
         self.local_run = local_run
         self.snap_steps = snap_steps
     def on_step_end(self, args, state, control, **kwargs):
         if state.global_step > 0 and state.global_step % self.snap_steps == 0:
             try:
-                emb = self.wake_embed.weight.data[self.old_vocab:].detach().cpu()
+                emb = self.wake_embed.weight.data.detach().cpu()
                 torch.save(emb, self.local_run / f"emb_step{state.global_step:04d}.pt")
                 print(f"[EMB] step {state.global_step}: local snapshot ({emb.shape[0]} tokens)")
             except Exception as e:
                 print(f"[EMB] {e}")
 
 class DriveSentry(TrainerCallback):
-    """lightweight Drive backup"""
-    def __init__(self, wake_embed, old_vocab, num_added, sentry_dir):
+    """lightweight Drive backup: just the learned embeddings + training state.
+    no model.save_pretrained(), no copytree, no os.sync().
+    ~215MB per save instead of ~16GB. Qween can breathe."""
+    def __init__(self, wake_embed, wake_start, num_wake, sentry_dir):
         self.wake_embed = wake_embed
-        self.old_vocab = old_vocab
-        self.num_added = num_added
+        self.wake_start = wake_start
+        self.num_wake = num_wake
         self.sentry_dir = sentry_dir
     def on_save(self, args, state, control, **kw):
         try:
@@ -374,20 +377,20 @@ class DriveSentry(TrainerCallback):
             dst = self.sentry_dir / f"sentry_step_{step:04d}.pt"
             if dst.exists():
                 return
-            emb = self.wake_embed.weight.data[self.old_vocab:].detach().cpu().half()
+            emb = self.wake_embed.weight.data.detach().cpu().half()
             torch.save({
                 'embeddings': emb,
                 'step': step,
                 'best_metric': state.best_metric,
                 'epoch': state.epoch,
-                'old_vocab': self.old_vocab,
-                'num_added': self.num_added,
+                'wake_start': self.wake_start,
+                'num_wake': self.num_wake,
             }, dst)
             size_mb = dst.stat().st_size / (1024 * 1024)
             print(f"[SENTRY] step {step}: {size_mb:.0f}MB to Drive (embeddings only)")
         except Exception as e:
             print(f"[SENTRY] {e}")
-
+            
 class LossMonitor(TrainerCallback):
     """yell if train and eval diverge too much"""
     def __init__(self):
@@ -490,8 +493,9 @@ trainer = EmbOnlyTrainer(
     model=model, args=args,
     train_dataset=train_ds, eval_dataset=val_ds,
     data_collator=None,
-    EmbeddingSnapshot(wte.wake_embed, old_vocab, LOCAL_RUN, EMB_SNAP_STEPS),
-        DriveSentry(wte.wake_embed, old_vocab, num_added, SENTRY),
+        callbacks=[
+        EmbeddingSnapshot(overlay.wake_embed, LOCAL_RUN, EMB_SNAP_STEPS),
+        DriveSentry(overlay.wake_embed, wake_start, actual_wake_count, SENTRY),
         LossMonitor(), StepTimer(),],
 )
 
