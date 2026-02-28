@@ -100,7 +100,7 @@ Only implemented for TinyLlama so far.
 | Warmup | 5% | 5% | 5% | 5% |
 | Batch | 1 (effective 16) | 1 (effective 16) | 1 (effective 16) | 1 (effective 16) |
 | Seq len | 256 | 512 | 256 | 256 |
-| Steps | 1,300 | 3,000 | 3,000 | 3,000 |
+| Steps | 3000 | 3000 | 3000 | 3000 |
 | Save every | 100 | 50 | 50 | 50 |
 
 ### Phase 2 (LoRA) -- TinyLlama only
