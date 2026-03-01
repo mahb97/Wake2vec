@@ -134,7 +134,8 @@ EVAL_STEPS = 50
 EMB_SNAP_STEPS = 20
 
 RESUME_FROM = None
-# RESUME_FROM = SENTRY / "checkpoint-200"   # uncomment when gaslight GPU strikes
+# (example) 
+# RESUME_FROM = SENTRY / "sentry_step_0080.pt" 
 
 # VRAM math:
 #   4-bit model body: ~8GB
@@ -513,10 +514,26 @@ print("=" * 60)
 # train 
 # (to be or not to be innit)
 t0 = time.time()
-trainer.train()
-elapsed = (time.time() - t0) / 60
-print(f"\nTRAINING COMPLETE ({elapsed:.1f} minutes)")
-print(f"that's {elapsed/60:.1f} hours of T4 time.")
+# uncomment if RESUME_FROM=NONE 
+# trainer.train()
+# elapsed = (time.time() - t0) / 60
+# print(f"\nTRAINING COMPLETE ({elapsed:.1f} minutes)")
+# print(f"that's {elapsed/60:.1f} hours of T4 time.")
+
+# uncomment if resumimg from checkpoint 
+# if RESUME_FROM is not None and RESUME_FROM.exists():
+#    ckpt = torch.load(RESUME_FROM, map_location="cpu")
+#    with torch.no_grad():
+#        overlay.wake_embed.weight.data.copy_(ckpt['embeddings'].float())
+#    resume_step = ckpt['step']
+#    remaining = MAX_STEPS - resume_step
+#    args.max_steps = remaining
+#    args.warmup_steps = max(20, remaining // 20)
+#    print(f"[RESUME] Restored embeddings from step {resume_step}")
+#    print(f"[RESUME] Remaining: {remaining} steps (warmup: {args.warmup_steps})")
+#    trainer.train()
+#else:
+#    trainer.train()
 
 # save final 
 final_dir = RUN_DIR / "final"
@@ -560,4 +577,352 @@ if state_files:
             print(f"Final val loss: {v_losses[-1]:.4f}")
             print(f"Best val loss: {min(v_losses):.4f}")
 
-  # let's see if this shit even runs before i worry about an analysis 
+# embed analysis 
+import numpy as np
+from numpy.linalg import norm as l2
+from scipy import stats
+from sklearn.decomposition import PCA
+import gc
+
+torch.cuda.empty_cache()
+gc.collect()
+
+# get embeds from wake overlay
+E_wake = overlay.wake_embed.weight.detach().cpu().float().numpy()  # (43824, 5120) trained
+E_base = overlay.full_embed.weight[:wake_start].detach().cpu().float().numpy()  # (152064, 5120) frozen
+n_wake = E_wake.shape[0]  # actual_wake_count
+n_base = E_base.shape[0]  # wake_start = BASE_VOCAB
+dim = E_wake.shape[1]     # 5120
+
+print(f"Embedding analysis: {n_base} base tokens + {n_wake} wake tokens in {dim}-d space")
+
+# pre-training snapshot (full table saved before training started)
+pre_path = RUN_DIR / "embeddings_pre.pt"
+has_pre = pre_path.exists()
+E_pre_wake = None
+if has_pre:
+    E_pre_all = torch.load(pre_path, map_location="cpu").float().numpy()
+    E_pre_wake = E_pre_all[wake_start:wake_start + n_wake]
+    # base didn't change (frozen), so no need to load E_pre_base
+    del E_pre_all
+    gc.collect()
+
+# Norm analysis
+base_norms = l2(E_base, axis=1)
+wake_norms = l2(E_wake, axis=1)
+
+t_stat, t_pval = stats.ttest_ind(base_norms, wake_norms, equal_var=False)
+u_stat, u_pval = stats.mannwhitneyu(base_norms, wake_norms, alternative='two-sided')
+pooled_std = np.sqrt((base_norms.std()**2 + wake_norms.std()**2) / 2)
+cohens_d = (base_norms.mean() - wake_norms.mean()) / pooled_std
+
+print("=" * 60)
+print("1. NORM ANALYSIS")
+print("=" * 60)
+print(f"  Base    -- mean: {base_norms.mean():.4f}, std: {base_norms.std():.4f} (n={n_base})")
+print(f"  Wake    -- mean: {wake_norms.mean():.4f}, std: {wake_norms.std():.4f} (n={n_wake})")
+print(f"  Welch t:  t={t_stat:.4f}, p={t_pval:.2e}")
+print(f"  Mann-Whitney U: U={u_stat:.0f}, p={u_pval:.2e}")
+print(f"  Cohen's d: {cohens_d:.4f}")
+# Qwen-specific: spherical init used radius = 1.5 * base_radius
+# check if wake norms are still clustered or have dispersed
+print(f"  Wake norm range: [{wake_norms.min():.4f}, {wake_norms.max():.4f}]")
+print(f"  Wake norm CV:    {wake_norms.std() / wake_norms.mean():.4f} (lower = still spherical)")
+
+# isotropy
+def compute_isotropy(embeddings, seed=42):
+    """Mu et al. 2018 partition function ratio. Higher = more isotropic."""
+    centered = embeddings - embeddings.mean(axis=0)
+    nrm = l2(centered, axis=1, keepdims=True)
+    nrm = np.where(nrm < 1e-12, 1e-12, nrm)
+    unit = centered / nrm
+    rng = np.random.default_rng(seed)
+    n = min(5000, len(unit))
+    idx = rng.choice(len(unit), size=n, replace=False)
+    sample = unit[idx]
+    cos_mat = sample @ sample.T
+    np.fill_diagonal(cos_mat, 0)
+    Z = np.exp(cos_mat).sum(axis=1)
+    isotropy = Z.min() / Z.max()
+    mean_cos = cos_mat.sum() / (n * (n - 1))
+    return isotropy, mean_cos, n
+
+iso_base, cos_base, n_iso_base = compute_isotropy(E_base)
+iso_wake, cos_wake, n_iso_wake = compute_isotropy(E_wake)
+
+print(f"\n{'=' * 60}")
+print("2. ISOTROPY (Mu et al. 2018 partition function ratio)")
+print("=" * 60)
+print(f"  Base -- {iso_base:.6f} (mean_cos: {cos_base:.4f}, n={n_iso_base})")
+print(f"  Wake -- {iso_wake:.6f} (mean_cos: {cos_wake:.4f}, n={n_iso_wake})")
+
+# drift (spherical init -> trained)
+def safe_cos(a, b):
+    na = l2(a, axis=1, keepdims=True); na = np.where(na < 1e-12, 1e-12, na)
+    nb = l2(b, axis=1, keepdims=True); nb = np.where(nb < 1e-12, 1e-12, nb)
+    return np.sum((a / na) * (b / nb), axis=1)
+
+print(f"\n{'=' * 60}")
+print("3. DRIFT (how far did wake tokens move from spherical init?)")
+print("=" * 60)
+
+if has_pre and E_pre_wake is not None:
+    wake_drift_cos = safe_cos(E_pre_wake, E_wake)
+    wake_drift_l2 = l2(E_wake - E_pre_wake, axis=1)
+
+    print(f"  Wake cosine drift: {wake_drift_cos.mean():.6f} +/- {wake_drift_cos.std():.6f}")
+    print(f"  Wake L2 drift:     {wake_drift_l2.mean():.4f} +/- {wake_drift_l2.std():.4f}")
+    print(f"  (base tokens are frozen via WakeOverlay — no drift by construction)")
+
+    wake_drift_order = np.argsort(wake_drift_cos)
+    print(f"\n  Top 20 most-changed Wake tokens (broke free from the sphere):")
+    for rank, idx in enumerate(wake_drift_order[:20]):
+        global_idx = wake_start + idx
+        token_str = tok.convert_ids_to_tokens(int(global_idx))
+        print(f"    {rank+1:2d}. {token_str!r:25s} cos={wake_drift_cos[idx]:.6f} L2={wake_drift_l2[idx]:.4f}")
+
+    print(f"\n  Top 20 least-changed (stayed close to init):")
+    for rank, idx in enumerate(wake_drift_order[-20:][::-1]):
+        global_idx = wake_start + idx
+        token_str = tok.convert_ids_to_tokens(int(global_idx))
+        print(f"    {rank+1:2d}. {token_str!r:25s} cos={wake_drift_cos[idx]:.6f} L2={wake_drift_l2[idx]:.4f}")
+else:
+    wake_drift_cos = None
+    print("  No pre-training snapshot found — skipping drift analysis")
+
+# nearest neighbours
+print(f"\n{'=' * 60}")
+print("4. NEAREST NEIGHBORS (who are the wake tokens hanging out with?)")
+print("=" * 60)
+
+# Normalize both sets
+base_norms_safe = l2(E_base, axis=1, keepdims=True)
+base_norms_safe = np.where(base_norms_safe < 1e-12, 1e-12, base_norms_safe)
+E_base_unit = E_base / base_norms_safe
+
+wake_norms_safe = l2(E_wake, axis=1, keepdims=True)
+wake_norms_safe = np.where(wake_norms_safe < 1e-12, 1e-12, wake_norms_safe)
+E_wake_unit = E_wake / wake_norms_safe
+
+# Sample 20 Wake tokens: first 10, middle 5, last 5
+sample_local = list(range(10))
+if n_wake > 100:
+    sample_local += list(range(n_wake // 2, n_wake // 2 + 5))
+if n_wake > 1000:
+    sample_local += list(range(n_wake - 5, n_wake))
+
+for local_idx in sample_local:
+    global_idx = wake_start + local_idx
+    wt = tok.convert_ids_to_tokens(global_idx)
+    # cosine similarity against all base tokens
+    sims = (E_wake_unit[local_idx:local_idx+1] @ E_base_unit.T).squeeze()
+    top5 = np.argsort(sims)[-5:][::-1]
+    nb = ", ".join(f"{tok.convert_ids_to_tokens(int(i))!r}({sims[i]:.3f})" for i in top5)
+    print(f"  {wt!r:25s} -> {nb}")
+
+del E_base_unit, E_wake_unit, base_norms_safe, wake_norms_safe
+gc.collect()
+
+# PCA / Intrinsic dimensionality
+print(f"\n{'=' * 60}")
+print("5. INTRINSIC DIMENSIONALITY (PCA)")
+print("=" * 60)
+
+n_comp = min(100, dim, n_base, n_wake)
+pca_base = PCA(n_components=n_comp).fit(E_base)
+pca_wake = PCA(n_components=n_comp).fit(E_wake)
+cumvar_base = np.cumsum(pca_base.explained_variance_ratio_)
+cumvar_wake = np.cumsum(pca_wake.explained_variance_ratio_)
+
+dim90_base = np.searchsorted(cumvar_base, 0.90) + 1
+dim95_base = np.searchsorted(cumvar_base, 0.95) + 1
+dim90_wake = np.searchsorted(cumvar_wake, 0.90) + 1
+dim95_wake = np.searchsorted(cumvar_wake, 0.95) + 1
+
+print(f"  Base -- 90% in {dim90_base} PCs, 95% in {dim95_base} PCs")
+print(f"  Wake -- 90% in {dim90_wake} PCs, 95% in {dim95_wake} PCs")
+print(f"  Base top-1 PC explains {pca_base.explained_variance_ratio_[0]*100:.1f}%")
+print(f"  Wake top-1 PC explains {pca_wake.explained_variance_ratio_[0]*100:.1f}%")
+
+# pairwise cosine distributions
+rng = np.random.default_rng(42)
+
+def sample_cos(E1, E2, n=2000):
+    i1 = rng.choice(len(E1), size=min(n, len(E1)), replace=False)
+    i2 = rng.choice(len(E2), size=min(n, len(E2)), replace=False)
+    s1, s2 = E1[i1], E2[i2]
+    n1 = l2(s1, axis=1, keepdims=True); n1 = np.where(n1 < 1e-12, 1e-12, n1)
+    n2 = l2(s2, axis=1, keepdims=True); n2 = np.where(n2 < 1e-12, 1e-12, n2)
+    c = (s1 / n1) @ (s2 / n2).T
+    return c[np.triu_indices_from(c, k=1)] if E1 is E2 else c.ravel()
+
+cos_bb = sample_cos(E_base, E_base)
+cos_ww = sample_cos(E_wake, E_wake)
+cos_bw = sample_cos(E_base, E_wake)
+
+ks_stat, ks_pval = stats.ks_2samp(cos_bb, cos_ww)
+
+print(f"\n{'=' * 60}")
+print("6. PAIRWISE COSINE SIMILARITY DISTRIBUTIONS")
+print("=" * 60)
+print(f"  (base,base) -- mean: {cos_bb.mean():.4f}, std: {cos_bb.std():.4f}")
+print(f"  (wake,wake) -- mean: {cos_ww.mean():.4f}, std: {cos_ww.std():.4f}")
+print(f"  (base,wake) -- mean: {cos_bw.mean():.4f}, std: {cos_bw.std():.4f}")
+print(f"  KS test (base-base vs wake-wake): D={ks_stat:.4f}, p={ks_pval:.2e}")
+
+# panel analysis fig
+fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+fig.suptitle("Wake2Vec P1 Qwen2.5-14B -- Embedding Analysis\n(the absolute unit)", fontsize=14, fontweight="bold")
+
+# Panel 1: Norm distributions
+ax = axes[0, 0]
+ax.hist(base_norms, bins=50, alpha=0.5, label=f"Base (\u03bc={base_norms.mean():.1f})", density=True)
+ax.hist(wake_norms, bins=50, alpha=0.5, label=f"Wake (\u03bc={wake_norms.mean():.1f})", density=True)
+ax.set_xlabel("L2 norm"); ax.set_ylabel("Density")
+ax.set_title("Norm Distribution: Base vs Wake"); ax.legend(fontsize=8); ax.grid(True, alpha=0.3)
+
+# Panel 2: Pairwise cosine distributions
+ax = axes[0, 1]
+ax.hist(cos_bb, bins=80, alpha=0.4, label=f"base-base (\u03bc={cos_bb.mean():.3f})", density=True)
+ax.hist(cos_ww, bins=80, alpha=0.4, label=f"wake-wake (\u03bc={cos_ww.mean():.3f})", density=True)
+ax.hist(cos_bw, bins=80, alpha=0.4, label=f"base-wake (\u03bc={cos_bw.mean():.3f})", density=True)
+ax.set_xlabel("Cosine similarity"); ax.set_ylabel("Density")
+ax.set_title("Pairwise Cosine Distributions"); ax.legend(fontsize=7); ax.grid(True, alpha=0.3)
+
+# Panel 3: PCA cumulative variance
+ax = axes[0, 2]
+ax.plot(range(1, n_comp+1), cumvar_base, 'b-', label=f"Base (90%@{dim90_base})")
+ax.plot(range(1, n_comp+1), cumvar_wake, 'r-', label=f"Wake (90%@{dim90_wake})")
+ax.axhline(0.90, ls='--', c='gray', alpha=0.5, label="90% threshold")
+ax.set_xlabel("Principal component"); ax.set_ylabel("Cumulative explained variance")
+ax.set_title("Intrinsic Dimensionality"); ax.legend(fontsize=8); ax.grid(True, alpha=0.3)
+
+# Panel 4: Drift histogram
+ax = axes[1, 0]
+if has_pre and wake_drift_cos is not None:
+    ax.hist(wake_drift_cos, bins=80, alpha=0.7, color="steelblue",
+            label=f"Wake (\u03bc={wake_drift_cos.mean():.4f})")
+    ax.axvline(1.0, ls='--', c='coral', alpha=0.8, label="No drift (cos=1)")
+    ax.set_xlabel("Cosine similarity (init \u2192 trained)"); ax.set_ylabel("Frequency")
+    ax.set_title("Wake Token Drift from Spherical Init"); ax.legend(fontsize=8)
+else:
+    ax.text(0.5, 0.5, "No pre-training\nsnapshot", ha='center', va='center',
+            transform=ax.transAxes, fontsize=12, color='gray')
+ax.grid(True, alpha=0.3)
+
+# Panel 5: Norm by token index
+ax = axes[1, 1]
+# subsample base for scatter (152K points is too many)
+base_sample_idx = rng.choice(n_base, size=min(10000, n_base), replace=False)
+ax.scatter(base_sample_idx, base_norms[base_sample_idx], s=0.1, alpha=0.3, label="Base", c="blue")
+ax.scatter(np.arange(n_wake) + wake_start, wake_norms, s=0.1, alpha=0.3, label="Wake", c="red")
+ax.set_xlabel("Token index"); ax.set_ylabel("L2 norm")
+ax.set_title("Norm by Token Index"); ax.legend(fontsize=8, markerscale=10); ax.grid(True, alpha=0.3)
+
+# Panel 6: Top-20 eigenspectrum
+ax = axes[1, 2]
+x = np.arange(1, 21)
+w = 0.35
+ax.bar(x - w/2, pca_base.explained_variance_ratio_[:20], w, alpha=0.7, label="Base")
+ax.bar(x + w/2, pca_wake.explained_variance_ratio_[:20], w, alpha=0.7, label="Wake")
+ax.set_xlabel("Principal component"); ax.set_ylabel("Explained variance ratio")
+ax.set_title("Top-20 PC Eigenspectrum"); ax.legend(fontsize=8); ax.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig(RUN_DIR / "p1_qwen14b_analysis.png", dpi=150, bbox_inches="tight")
+plt.show()
+print(f"Analysis plot saved: {RUN_DIR / 'p1_qwen14b_analysis.png'}")
+
+# summary json 
+report = {
+    "model": MODEL_NAME,
+    "phase": "P1_embedding_only",
+    "architecture": "WakeOverlay (base frozen fp16, wake trainable fp32)",
+    "vocab": {
+        "base": int(n_base),
+        "wake": int(n_wake),
+        "total": int(n_base + n_wake),
+        "already_in_vocab": int(already_known),
+    },
+    "dim": int(dim),
+    "training_data": ["FW_TEXT.txt", "wake_lexicon.txt"],
+    "hyperparameters": {
+        "lr": LR, "max_steps": MAX_STEPS, "batch_size": BATCH_SIZE,
+        "grad_accum": GRAD_ACCUM, "seq_len": SEQ_LEN,
+        "optimizer": "Adafactor (no momentum)",
+        "init": "spherical (1.5x base radius)",
+    },
+    "norms": {
+        "base": {"mean": float(base_norms.mean()), "std": float(base_norms.std())},
+        "wake": {"mean": float(wake_norms.mean()), "std": float(wake_norms.std()),
+                 "min": float(wake_norms.min()), "max": float(wake_norms.max()),
+                 "cv": float(wake_norms.std() / wake_norms.mean())},
+        "welch_t": {"t": float(t_stat), "p": float(t_pval)},
+        "mann_whitney_u": {"U": float(u_stat), "p": float(u_pval)},
+        "cohens_d": float(cohens_d),
+    },
+    "isotropy": {
+        "base": {"score": float(iso_base), "mean_cos": float(cos_base), "n": int(n_iso_base)},
+        "wake": {"score": float(iso_wake), "mean_cos": float(cos_wake), "n": int(n_iso_wake)},
+    },
+    "pairwise_cosine": {
+        "base_base": {"mean": float(cos_bb.mean()), "std": float(cos_bb.std())},
+        "wake_wake": {"mean": float(cos_ww.mean()), "std": float(cos_ww.std())},
+        "base_wake": {"mean": float(cos_bw.mean()), "std": float(cos_bw.std())},
+        "ks_test_bb_vs_ww": {"D": float(ks_stat), "p": float(ks_pval)},
+    },
+    "intrinsic_dim": {
+        "base_90pct": int(dim90_base), "base_95pct": int(dim95_base),
+        "wake_90pct": int(dim90_wake), "wake_95pct": int(dim95_wake),
+        "base_top1_var": float(pca_base.explained_variance_ratio_[0]),
+        "wake_top1_var": float(pca_wake.explained_variance_ratio_[0]),
+    },
+    "loss": {
+        "final_train": float(losses[-1]) if train_data else None,
+        "final_eval": float(v_losses[-1]) if val_data else None,
+        "best_eval": float(min(v_losses)) if val_data else None,
+    },
+}
+if has_pre and wake_drift_cos is not None:
+    report["drift"] = {
+        "wake_cosine_mean": float(wake_drift_cos.mean()),
+        "wake_cosine_std": float(wake_drift_cos.std()),
+        "wake_l2_mean": float(wake_drift_l2.mean()),
+        "wake_l2_std": float(wake_drift_l2.std()),
+        "note": "base tokens frozen via WakeOverlay — zero drift by construction",
+    }
+
+summary_path = RUN_DIR / "p1_qwen14b_summary.json"
+summary_path.write_text(json.dumps(report, indent=2))
+print(f"\n[SUMMARY] {summary_path}")
+
+# wake generation samples 
+model.eval()
+model.config.use_cache = True
+
+def generate_wake(prompt, max_new_tokens=256, temperature=0.9, top_p=0.92,
+                  top_k=50, repetition_penalty=1.15, num_return_sequences=1):
+    inputs = tok(prompt, return_tensors="pt").to("cuda")
+    prompt_len = inputs["input_ids"].shape[1]
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs, max_new_tokens=max_new_tokens, temperature=temperature,
+            top_p=top_p, top_k=top_k, repetition_penalty=repetition_penalty,
+            num_return_sequences=num_return_sequences, do_sample=True,
+            pad_token_id=tok.pad_token_id)
+    print(f"-- temp={temperature} | top_p={top_p} | top_k={top_k} --")
+    for i, seq in enumerate(outputs):
+        gen = tok.decode(seq[prompt_len:], skip_special_tokens=True)
+        if num_return_sequences > 1:
+            print(f"\n[{i+1}]")
+        print(gen)
+    print("-" * 60)
+
+# standard prompt 
+generate_wake("riverrun, past Eve and Adam's,")
+
+# uncomment for more vibes:
+# generate_wake("riverrun, past Eve and Adam's,", temperature=1.1)
+# generate_wake("riverrun, past Eve and Adam's,", num_return_sequences=3)
+
+# use best training / val cbeckpoint for P2 
