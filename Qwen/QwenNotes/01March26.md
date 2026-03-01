@@ -16,7 +16,8 @@ At 131s/step the full 2920 remaining steps would take ~106 hours that's okay tho
 
 | Step (global) | Train | Val | 
 |---------------|-------|-----|
-| 50 | 345.26 | 21.54 | 
+| 50 | 345.26 | 21.54 |
+| 100 | 321.48 | 20.98 |
  
 ---
 track for you: Bearcubs [touch](https://soundcloud.com/bearcubs/touch-original-mix?si=1b608f96198d442580011eca45c6ea89&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing)
