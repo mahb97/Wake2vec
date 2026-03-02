@@ -40,6 +40,6 @@ Loading P1 embeddings from **step 1400** (best val 5.36) rather than step 3000 p
 | Step | Train | Val | Notes |
 |------|-------|-----|-------|
 | 100 | 4.23 | 4.38 | already below P1 final val (5.46) |
-
+| 200 | 4.02 | 4.20 | ~0.18. |
 ---
 
