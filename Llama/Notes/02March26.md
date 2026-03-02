@@ -14,8 +14,14 @@ Got cut off at step 2990 last session, I'm not crying, you are. Resuming from se
 | 2000 | 63.46 | 5.45 | |
 | 2200 | 60.32 | 5.46 | |
 | 2600 | 61.92 | 5.46 | |
-| 2900 | | | |
+| 2900 | 61.22 | 5.46 | |
+| **3000** | **61.23** | **5.46** | **COMPLETE.** Val plateaued since step 1400 |
 
 ---
 
 Avaion bby because I'm sad, always: [Pieces](https://soundcloud.com/avaion-music/pieces?si=434029dba0134ecd9f15eb35a2ad994e&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing) 
+
+---
+
+Generation samples: 
+
