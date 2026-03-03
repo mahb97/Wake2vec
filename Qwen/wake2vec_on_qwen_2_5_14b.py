@@ -132,6 +132,7 @@ SAVE_STEPS = 20              # colab disconnect PTSD
 LOG_STEPS = 20
 EVAL_STEPS = 50
 EMB_SNAP_STEPS = 20
+STEP_OFFSET = 140 # run1(80) + run2(60)
 
 RESUME_FROM = None
 # (example) 
@@ -345,53 +346,59 @@ print(f"  Pre-training snapshot saved: {E_pre.shape}")
 # callbacks
 # Strategy: save ONLY the trainable embeddings to Drive (~215MB fp16).
 import time
+import shutil
 from transformers import TrainerCallback
 
 class EmbeddingSnapshot(TrainerCallback):
-    """local breadcrumb trail: save wake embeddings every N steps.
-    fast because it's local SSD, not Drive."""
-    def __init__(self, wake_embed, local_run, snap_steps):
+    """local breadcrumb trail"""
+    def __init__(self, wake_embed, local_run, snap_steps, step_offset=0):
         self.wake_embed = wake_embed
         self.local_run = local_run
         self.snap_steps = snap_steps
+        self.step_offset = step_offset
     def on_step_end(self, args, state, control, **kwargs):
         if state.global_step > 0 and state.global_step % self.snap_steps == 0:
             try:
+                global_step = state.global_step + self.step_offset
                 emb = self.wake_embed.weight.data.detach().cpu()
-                torch.save(emb, self.local_run / f"emb_step{state.global_step:04d}.pt")
-                print(f"[EMB] step {state.global_step}: local snapshot ({emb.shape[0]} tokens)")
+                torch.save(emb, self.local_run / f"emb_step{global_step:04d}.pt")
+                print(f"[EMB] step {global_step}: local snapshot ({emb.shape[0]} tokens)")
             except Exception as e:
                 print(f"[EMB] {e}")
 
 class DriveSentry(TrainerCallback):
-    """lightweight Drive backup: just the learned embeddings + training state.
-    no model.save_pretrained(), no copytree, no os.sync().
-    ~215MB per save instead of ~16GB. Qween can breathe."""
-    def __init__(self, wake_embed, wake_start, num_wake, sentry_dir):
+    """lightweight Drive backup — saves local first, then copies to Drive (avoids FUSE hang)"""
+    def __init__(self, wake_embed, wake_start, num_wake, sentry_dir, step_offset=0, local_run=None):
         self.wake_embed = wake_embed
         self.wake_start = wake_start
         self.num_wake = num_wake
         self.sentry_dir = sentry_dir
+        self.step_offset = step_offset
+        self.local_run = local_run or Path("/content/runs")
     def on_save(self, args, state, control, **kw):
         try:
-            step = state.global_step
-            dst = self.sentry_dir / f"sentry_step_{step:04d}.pt"
+            global_step = state.global_step + self.step_offset
+            dst = self.sentry_dir / f"sentry_step_{global_step:04d}.pt"
             if dst.exists():
                 return
             emb = self.wake_embed.weight.data.detach().cpu().half()
-            torch.save({
+            payload = {
                 'embeddings': emb,
-                'step': step,
+                'step': global_step,
                 'best_metric': state.best_metric,
                 'epoch': state.epoch,
                 'wake_start': self.wake_start,
                 'num_wake': self.num_wake,
-            }, dst)
+            }
+            local_tmp = self.local_run / "sentry_tmp.pt"
+            torch.save(payload, local_tmp)
+            shutil.copy2(local_tmp, dst)
+            local_tmp.unlink()
             size_mb = dst.stat().st_size / (1024 * 1024)
-            print(f"[SENTRY] step {step}: {size_mb:.0f}MB to Drive (embeddings only)")
+            print(f"[SENTRY] step {global_step}: {size_mb:.0f}MB to Drive")
         except Exception as e:
             print(f"[SENTRY] {e}")
-            
+
 class LossMonitor(TrainerCallback):
     """yell if train and eval diverge too much"""
     def __init__(self):
@@ -407,7 +414,7 @@ class LossMonitor(TrainerCallback):
                 print(f"[WARN] train/eval gap: {gap:.2f} — might be vibing too hard")
 
 class StepTimer(TrainerCallback):
-    """track how slow this absolute unit is"""
+    """track how slow qwen is"""
     def __init__(self):
         self.step_times = []
         self.last_time = None
@@ -421,7 +428,7 @@ class StepTimer(TrainerCallback):
                 remaining = (MAX_STEPS - state.global_step) * avg / 60
                 print(f"[{state.global_step:4d}] {avg:.1f}s/step | ~{remaining:.0f}min remaining")
         self.last_time = now
-
+        
 # patch 
 import accelerate.accelerator as _acc
 _orig_prepare = _acc.Accelerator.prepare_model
@@ -519,21 +526,24 @@ t0 = time.time()
 # elapsed = (time.time() - t0) / 60
 # print(f"\nTRAINING COMPLETE ({elapsed:.1f} minutes)")
 # print(f"that's {elapsed/60:.1f} hours of T4 time.")
-
-# uncomment if resumimg from checkpoint 
-# if RESUME_FROM is not None and RESUME_FROM.exists():
-#    ckpt = torch.load(RESUME_FROM, map_location="cpu")
-#    with torch.no_grad():
-#        overlay.wake_embed.weight.data.copy_(ckpt['embeddings'].float())
-#    resume_step = ckpt['step']
-#    remaining = MAX_STEPS - resume_step
-#    args.max_steps = remaining
-#    args.warmup_steps = max(20, remaining // 20)
-#    print(f"[RESUME] Restored embeddings from step {resume_step}")
-#    print(f"[RESUME] Remaining: {remaining} steps (warmup: {args.warmup_steps})")
-#    trainer.train()
-#else:
-#    trainer.train()
+if RESUME_FROM is not None and RESUME_FROM.exists():
+    ckpt = torch.load(RESUME_FROM, map_location="cpu")
+    with torch.no_grad():
+        overlay.wake_embed.weight.data.copy_(ckpt['embeddings'].float())
+    STEP_OFFSET = STEP_OFFSET if STEP_OFFSET > 0 else ckpt['step']
+    remaining = MAX_STEPS - STEP_OFFSET
+    args.max_steps = remaining
+    args.warmup_steps = max(20, remaining // 20)
+    # rebuild callbacks with correct offset
+    trainer.callback_handler.callbacks = [
+        cb for cb in trainer.callback_handler.callbacks
+        if not isinstance(cb, (EmbeddingSnapshot, DriveSentry))
+    ]
+    trainer.add_callback(EmbeddingSnapshot(overlay.wake_embed, LOCAL_RUN, EMB_SNAP_STEPS, STEP_OFFSET))
+    trainer.add_callback(DriveSentry(overlay.wake_embed, wake_start, actual_wake_count, SENTRY, STEP_OFFSET))
+    print(f"[RESUME] Restored embeddings from step {STEP_OFFSET}")
+    print(f"[RESUME] STEP_OFFSET={STEP_OFFSET}, remaining={remaining}, warmup={args.warmup_steps}")
+trainer.train()
 
 # save final 
 final_dir = RUN_DIR / "final"
