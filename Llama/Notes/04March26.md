@@ -14,6 +14,7 @@ Back on Llama P2 today`:
 | 100 | 4.23 | 4.38 | session 1 |
 | 200 | 4.03 | 4.21 | session 1 (cut off at 208) |
 | 300 | 3.89 | 4.10 | 04 March |
+| 400 | 3.76 | 4.05 | "" |
 
 ---
 
