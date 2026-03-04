@@ -111,6 +111,9 @@ LOG_STEPS = 50
 EVAL_STEPS = 100
 EMB_SNAP_STEPS = 50
 
+# uncomment as needed 
+# RESUME_FROM SENTRY / "checkpoint - 200"
+
 # call my daughter LoRA
 LORA_RANK = 8
 LORA_ALPHA = 16
@@ -462,7 +465,14 @@ print(f"  LoRA targets: {LORA_TARGETS}")
 print(f"  Embeddings: FROZEN")
 
 t0 = time.time()
-trainer.train()
+if RESUME_FROM is not None and RESUME_FROM.exists():
+    local_ckpt = LOCAL_RUN / RESUME_FROM.name
+    if not local_ckpt.exists():
+        shutil.copytree(RESUME_FROM, local_ckpt)
+    print(f"[RESUME] Resuming from {RESUME_FROM.name}")
+    trainer.train(resume_from_checkpoint=str(local_ckpt))
+else:
+    trainer.train()
 elapsed = (time.time() - t0) / 60
 
 print(f"\nTRAINING COMPLETE ({elapsed:.1f} minutes)")
