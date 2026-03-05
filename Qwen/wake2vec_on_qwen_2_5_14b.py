@@ -452,8 +452,10 @@ print(f"Wake overlay size: {wte.wake_embed.weight.nelement() * wte.wake_embed.we
 from transformers import TrainingArguments, Trainer
 
 class EmbOnlyTrainer(Trainer):
-    """custom trainer: Adafactor on just the embedding weight.
-    no momentum = no extra memory = we live another day."""
+    def save_model(self, output_dir=None, _internal_call=False):
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+
     def create_optimizer(self):
         # critical for 14B on T4 where every MB counts
         from transformers.optimization import Adafactor
