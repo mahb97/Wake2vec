@@ -21,6 +21,13 @@ class EmbOnlyTrainer(Trainer):
 
 Also fixed: DriveSentry in the resume block was missing `LOCAL_RUN` parameter, that would have fallen back to default path instead of local-first write.
 
+| Global step | Train | Val | Session | Notes |
+|-------------|-------|-----|---------|-------|
+| 50 | 345.00 | 21.54 | 1 | |
+| 100 | 321.48 | 20.98 | 2 | |
+| 150 | 303.07 | 20.64 | 3 | |
+
+
 ---
 
 focus time lol: [Don't You](https://soundcloud.com/jerryfolkmusic/dont-you-ft-izza-gara?si=e45417052d1a486f99263535ff56af31&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing)
