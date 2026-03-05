@@ -23,16 +23,4 @@ Also fixed: DriveSentry in the resume block was missing `LOCAL_RUN` parameter, t
 
 ---
 
-## Llama 3.2-1B P2 — step 300
-
-| Step | Train | Val | Gap |
-|------|-------|-----|-----|
-| 100 | 4.23 | 4.38 | 0.14 |
-| 200 | 4.03 | 4.21 | 0.18 |
-| 300 | 3.89 | 4.11 | 0.22 |
-
-Both still dropping. Gap widening slightly but no sign of overfitting yet.
-
----
-
 focus time lol: [Don't You](https://soundcloud.com/jerryfolkmusic/dont-you-ft-izza-gara?si=e45417052d1a486f99263535ff56af31&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing)
