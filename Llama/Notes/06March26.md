@@ -15,6 +15,9 @@ Resuming P2 LoRA from `checkpoint-500` via `resume_from_checkpoint`. Trainer-nat
 | 300 | 3.89 | 4.11 | 0.22 | 2 |
 | 400 | 3.76 | 4.05 | 0.29 | 2 |
 | 500 | 3.65 | 4.04 | 0.39 | 2 |
+| 600	| 3.59 | 4.04 |	0.46 | 3 |
+| 700 |	3.54 | 4.05 |	0.51 | 3 |
+
 
 Also, a note on linguistics: if Noam Chomsky is your go - to, you haven't studied linguistics critically enough and you also clearly haven't read the Epstein Files. 
 
