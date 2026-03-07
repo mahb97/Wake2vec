@@ -19,7 +19,7 @@ Sentry at step 200 landed clean (428MB). Training speed improved to ~115s/step (
 | 50 | 345.00 | 21.54 | 1 | 
 | 100 | 321.48 | 20.98 | 1 |
 | 150 | 303.07 | 20.64 | 4 |
-| 200 | — | — | 5 |
+| 200 | 289.19 | 20.50 | 5 |
 
 ## Notes
 
