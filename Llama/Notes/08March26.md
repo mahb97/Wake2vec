@@ -20,6 +20,7 @@ Resuming from `checkpoint-800` via `resume_from_checkpoint`. Optimizer and sched
 | 800 | 3.47 | 4.08 | 0.60 | 3 |
 | 900 | 3.42 | 4.09 | 0.67 | 4 |
 | 1000 | 3.36 | 4.12 | 0.76 | 4 | 
+| 1100 | 3.34 | 4.14 | 0.8 | 4 |
 
 ### The plateau question
 
