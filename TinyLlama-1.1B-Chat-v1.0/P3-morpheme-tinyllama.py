@@ -514,7 +514,7 @@ class MorphemeIndex:
 # Build the index
 morph_index = MorphemeIndex(morpheme_groups, tok, device="cuda")
 
-# All Wake token indices for repulsion + norm losses
+# all Wake token indices for repulsion + norm losses
 ALL_WAKE_IDS = torch.arange(BASE_VOCAB, TOTAL_VOCAB, dtype=torch.long).cuda()
 
 
@@ -554,20 +554,19 @@ def compute_norm_loss(model, target=TARGET_NORM, margin=NORM_MARGIN):
     return loss
 
 
-# device contrastive loss 
+# Device contrastive loss 
 class DeviceIndex:
-    """Precomputed index for triplet sampling across device groups."""
 
     def __init__(self, groups, tokenizer, device="cuda"):
         self.device = device
         self.n_groups = len(groups)
         self.group_names = [g["device"] for g in groups]
 
-        # For each group: list of word token ID lists
+        # for each group: list of word token ID lists
         self.groups_word_ids = [g["word_ids"] for g in groups]
         self.group_sizes = [g["n_valid"] for g in groups]
 
-        # Flat array of group labels per word (for negative sampling)
+        # flat array of group labels per word (for negative sampling)
         self.all_word_ids = []    # list of token ID lists
         self.all_group_labels = []  # group index for each word
         for gi, g in enumerate(groups):
@@ -582,18 +581,20 @@ class DeviceIndex:
         print(f"DeviceIndex: {self.n_groups} groups, {self.total_words} words")
 
     def _embed_word(self, w_ids, embed_weight):
+
         t = torch.tensor(w_ids, device=self.device, dtype=torch.long)
         return embed_weight[t].mean(dim=0)
 
     def compute_loss(self, embed_weight, n_triplets=DEVICE_TRIPLETS, margin=DEVICE_MARGIN):
+
         if self.n_groups < 2 or self.total_words < 3:
             return torch.tensor(0.0, device=self.device)
 
-        # Sample anchor indices
+        # sample anchor indices
         anchor_idx = torch.randint(0, self.total_words, (n_triplets,), device=self.device)
         anchor_groups = self.all_group_labels_t[anchor_idx]
 
-        # For each anchor, sample a positive (same group) and negative (different group)
+        # for each anchor, sample a positive (same group) and negative (different group)
         anchor_vecs = []
         pos_vecs = []
         neg_vecs = []
@@ -603,24 +604,24 @@ class DeviceIndex:
             ai = anchor_idx[i].item()
             ag = anchor_groups[i].item()
 
-            # Same-group indices
+            # same-group indices
             same_mask = (self.all_group_labels_t == ag)
             same_indices = same_mask.nonzero(as_tuple=True)[0]
             if len(same_indices) < 2:
                 continue
 
-            # Different-group indices
+            # different-group indices
             diff_mask = (self.all_group_labels_t != ag)
             diff_indices = diff_mask.nonzero(as_tuple=True)[0]
             if len(diff_indices) == 0:
                 continue
 
-            # Pick random positive (not the anchor itself)
+            # pick random positive (not the anchor itself)
             pi = same_indices[torch.randint(0, len(same_indices), (1,))].item()
             while pi == ai and len(same_indices) > 1:
                 pi = same_indices[torch.randint(0, len(same_indices), (1,))].item()
 
-            # Pick random negative
+            # pick random negative
             ni = diff_indices[torch.randint(0, len(diff_indices), (1,))].item()
 
             anchor_vecs.append(self._embed_word(self.all_word_ids[ai], embed_weight))
@@ -635,7 +636,7 @@ class DeviceIndex:
         positives = torch.stack(pos_vecs)
         negatives = torch.stack(neg_vecs)
 
-        # Cosine similarities
+        # cosine similarities
         a_norm = F.normalize(anchors, dim=1)
         p_norm = F.normalize(positives, dim=1)
         n_norm = F.normalize(negatives, dim=1)
@@ -643,7 +644,7 @@ class DeviceIndex:
         cos_pos = (a_norm * p_norm).sum(dim=1)
         cos_neg = (a_norm * n_norm).sum(dim=1)
 
-        # Triplet margin loss
+        # triplet margin loss
         loss = torch.clamp(margin + cos_neg - cos_pos, min=0).mean()
         return loss
 
@@ -652,6 +653,7 @@ device_index = DeviceIndex(device_groups, tok, device="cuda")
 
 
 def compute_device_loss(model):
+    """L_device: triplet margin loss over stylistic device groups."""
     E = model.get_input_embeddings().weight
     return device_index.compute_loss(E)
 
