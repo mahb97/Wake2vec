@@ -28,3 +28,4 @@ val still dropping from 21.54 → 20.50 in 200 steps and train down 16% (345 →
 | Run 3 | 0–21 | 140–161 | FUSE hang at sentry write |
 | Run 4 | 0–26+ | 140–166+ | save_model override, sentry working |
 | Run 5 | 0–80 | 180–260 | 115s/step, sentry@200+260 confirmed |
+| Run 6 | 0–100 | 260–360 | T4 cut, sentry@360 confirmed |
