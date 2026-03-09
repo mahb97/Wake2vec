@@ -15,6 +15,7 @@ Resuming from `sentry_step_0260.pt` with `STEP_OFFSET=260`.
 | 150 | 303.07 | 20.64 | 4 |
 | 200 | 289.19 | 20.50 | 5 |
 | 250 | 278.96 | 19.89 | 6 |
+| 300 | 314.05 | 19.36 | 6 |
 
 val still dropping from 21.54 → 20.50 in 200 steps and train down 16% (345 → 289). 
 
