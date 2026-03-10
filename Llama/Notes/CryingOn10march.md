@@ -21,6 +21,8 @@ Resuming from `checkpoint-1100`. 1,900 steps to go.
 | 900 | 3.42 | 4.10 | 0.67 | 4 |
 | 1100 | 3.35 | 4.15 | 0.80 | 4 |
 | 1200 | 3.32 | 4.16 | 0.84 | 5 |
+| 1300 | 3.27 | 4.20 | 0.94 | 5 |
+| 1400 | 3.26 | 4.23 | 0.97 | 5 |
 
 Best val still step 500 (4.04) and train/val gap trend is 0.14 → 0.80 over 1100 steps. Classic overfit signature (sob, pass the tissues), but the LoRA layers are still learning attention patterns that P3 can inherit.
 
