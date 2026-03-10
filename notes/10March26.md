@@ -32,6 +32,11 @@ Also, copped this one from Chris Luno: [Massako](https://soundcloud.com/magnifik
 | 1300 | 0.9028 | 0.8921 | 0.0002 | 0.1936 | — | — |
 | 1350 | 0.9523 | 0.9416 | 0.0002 | 0.1933 | — | — |
 | 1400 | 0.8030 | 0.7920 | 0.0002 | 0.1974 | **4.1428** | 2/5 (reset) |
+| | | | | | | **manually stopped** |
+
+**Final:** train 1.9376, val 4.1428, best val 3.4188 (step 400). Sentry saved at step 1400.
+
+\* Early stop counter reset on resume — callback lost memory of best val 3.4188. Val worsened 6 consecutive evals from true best (3.4188 → 3.5554 → 3.7154 → 3.8638 → 4.0230 → 4.1428). Final train/val gap: 3.34.
 
 ### What we're watching for
 
@@ -52,3 +57,36 @@ Also, copped this one from Chris Luno: [Massako](https://soundcloud.com/magnifik
 | Early stop patience | 5 | 3 |
 
 The idea here is that if the geometry signal can't compete at whisper volume then turn it up a notch. 
+
+### P3 summary
+
+the loss curves tell the whole story:
+
+- **L_morph**: y-axis spans 0.000247325 to 0.000247500. 600 steps of training moved L_morph by 0.0000002 lol. P2 already solved morpheme composition completely, seems like there was nothing left for P3 to learn.
+- **L_device**: random walk between 0.17 and 0.24. no trend, no learning, at λ=0.05 the triplet signal was invisible against L_lm.
+- **L_lm**: dropped from 5.89 to 0.79 while val climbed from 3.67 to 4.14 so that's pure memorisation. 
+- **train/val gap**: 3.34 so memorised the Wake but didn't learn how to compose it, which was sort of the point here.
+
+**verdict:** P3 with weak lambdas is a non-result where the auxiliary losses contributed <0.3% of total loss and never moved which confirms the P3b thesis.
+
+P3b is loaded with λ_morph=50.0, λ_device=2.0. let's gooo.
+
+### Loss contribution at step 0 (the rebalancing)
+
+| Component | Raw | Lambda | Contribution | % of total |
+|-----------|-----|--------|-------------|------------|
+| L_lm | 2.9223 | 1.0 | 2.9223 | 87.6% |
+| L_device | 0.1993 | 2.0 | 0.3986 | 12.0% |
+| L_morph | 0.0002 | 50.0 | 0.0100 | 0.3% |
+| L_repulsion | 0.0001 | 0.05 | 0.0000 | ~0% |
+| L_norm | 0.1040 | 0.01 | 0.0010 | ~0% |
+| **Total** | | | **3.3345** | |
+
+device went from 0.3% to **12%** of total loss but morph is still tiny even at 50x because P2 solved it so completely (raw value 0.0002) so the real test is whether L_device drops.
+
+### P3b loss table
+
+| Step | L_total | L_lm | L_morph | L_device | Val | Early stop |
+|------|---------|------|---------|----------|-----|------------|
+| 0 | 3.3345 | 2.9223 | 0.0002 | 0.1993 | — | — |
+
