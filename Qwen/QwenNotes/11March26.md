@@ -16,6 +16,8 @@ Resuming from `sentry_step_0360.pt`.
 | 200 | 289.19 | 20.50 | 5 |
 | 250 | 278.96 | 19.89 | 6 |
 | 300 | 314.05 | 19.36 | 6 |
-| 360+ | | | *resuming today, session 7* |
+| 350 | 268.07 | 19.17 | 7 |
+
+Will it overfit or not, that is the question lol and no sign of plateau just yet. 
 
 here listen to [Pinku](https://soundcloud.com/baauer/pinku?in=houseof_kyri/sets/bitches-united-for-better-code&si=56c1ad67573a42e8bd33a246c19dbd06&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing) and enjoy the fact that you got to be alive at the same time as Baauer.
