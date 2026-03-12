@@ -17,6 +17,7 @@ Resuming from `sentry_step_0360.pt`.
 | 250 | 278.96 | 19.89 | 6 |
 | 300 | 314.05 | 19.36 | 6 |
 | 350 | 268.07 | 19.17 | 7 |
+| Run 7 | 0–100 | 360–460 | T4 cut, EMB@460, no eval landed |
 
 Will it overfit or not, that is the question lol and no sign of plateau just yet. 
 
