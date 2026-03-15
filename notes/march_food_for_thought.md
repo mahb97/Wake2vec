@@ -20,3 +20,10 @@ models for TU:
 - Do the assumptions behind μp → UP still hold in state-space models where there are no explicit attention heads to interrogate?
 - At what parameter scale does the Wake's idiolect actually "break through" pre-training? Is there a threshold effect, or is it smooth?
 - MoE routing introduces token-level selectivity so which experts activate on nonce formations vs. standard lexis?
+
+## RL for Wake2vec
+
+- train stylometric discriminator which is then used as the reward model.
+- or some kind of small-scale RLHF where outputs on Joycean authenticity are scored (would be nice to colab with other Joyceans or some FW reading group).
+
+(needs to reinforce specific behaviours that LoRA alone doesn't reliably produce)
