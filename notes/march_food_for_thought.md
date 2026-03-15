@@ -27,3 +27,5 @@ models for TU:
 - or some kind of small-scale RLHF where outputs on Joycean authenticity are scored (would be nice to colab with other Joyceans or some FW reading group).
 
 (needs to reinforce specific behaviours that LoRA alone doesn't reliably produce)
+
+- can literary style/a linguistic fingerprint be reinforced through adversarial stylometric feedback? 
