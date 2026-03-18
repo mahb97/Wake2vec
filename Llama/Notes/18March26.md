@@ -21,6 +21,7 @@ gap crossed 1.0 last time (train 3.22, val 4.25), overfitting but building LoRA 
 | 1500 | 3.22 | 4.25 | 1.04 | 5 |
 | 1600 | 3.18 | 4.26 | 1.09 | 6 |
 | 1700 | 3.17 | 4.29 | 1.11 | 6 |
+| 1800 | 3.14 | 4.30 | 1.16 | 6 |
 
 
 back ww/ Avaion for you: [way you smile](https://soundcloud.com/avaion-music/way-you-smile?in=avaion-music/sets/to-make-people-happy&si=5cd5b9d46fdf4567b22374585b151ea2&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing)
