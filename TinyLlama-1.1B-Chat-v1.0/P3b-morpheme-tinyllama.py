@@ -938,3 +938,102 @@ torch.save(final_emb, final_dir / "embeddings.pt")
 
 print(f"Final model saved to {final_dir}")
 
+""" Loss Curves & eval """
+# loss curve
+import matplotlib.pyplot as plt
+
+# train/val curve from Trainer state
+
+state_files = list(LOCAL_RUN.rglob("trainer_state.json"))
+train_data, val_data = [], []
+if state_files:
+    latest = max(state_files, key=lambda p: p.stat().st_mtime)
+    with open(latest) as f:
+        state = json.load(f)
+
+    logs = state.get("log_history", [])
+    train_data = [(d["step"], d["loss"]) for d in logs if "loss" in d and "eval_loss" not in d]
+    val_data = [(d["step"], d["eval_loss"]) for d in logs if "eval_loss" in d]
+
+
+# component breakdown via loss log
+
+fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+fig.suptitle("Wake2Vec P3b Geometric Refinement TinyLlama -- Loss Curves", fontsize=14, fontweight="bold")
+
+# a) train vs val
+ax = axes[0, 0]
+if train_data:
+    steps, losses = zip(*train_data)
+    ax.plot(steps, losses, 'b-o', label='Train', alpha=0.7, markersize=3)
+if val_data:
+    v_steps, v_losses = zip(*val_data)
+    ax.plot(v_steps, v_losses, 'r-s', label='Val', alpha=0.7, markersize=3)
+ax.set_xlabel('Step')
+ax.set_ylabel('Loss')
+ax.set_title('Train vs Val Loss (total)')
+ax.legend(fontsize=8)
+ax.grid(True, alpha=0.3)
+
+# b) LM loss component
+ax = axes[0, 1]
+if loss_log:
+    ll_steps = [d["step"] for d in loss_log if d["step"] > 0]
+    ll_lm = [d["lm"] for d in loss_log if d["step"] > 0]
+    ax.plot(ll_steps, ll_lm, 'b-o', markersize=3)
+ax.set_xlabel('Step')
+ax.set_ylabel('Loss')
+ax.set_title('LM Loss Component')
+ax.grid(True, alpha=0.3)
+
+# c) morpheme loss component
+ax = axes[0, 2]
+if loss_log:
+    ll_morph = [d["morph"] for d in loss_log if d["step"] > 0]
+    ax.plot(ll_steps, ll_morph, 'g-o', markersize=3)
+ax.set_xlabel('Step')
+ax.set_ylabel('Loss')
+
+# d) device loss component
+ax = axes[1, 0]
+if loss_log:
+    ll_device = [d["device"] for d in loss_log if d["step"] > 0]
+    ax.plot(ll_steps, ll_device, 'c-o', markersize=3)
+ax.set_xlabel('Step')
+ax.set_ylabel('Loss')
+ax.set_title('L_device (triplet contrastive)')
+ax.grid(True, alpha=0.3)
+
+# e) repulsion loss component
+ax = axes[1, 1]
+if loss_log:
+    ll_repul = [d["repulsion"] for d in loss_log if d["step"] > 0]
+    ax.plot(ll_steps, ll_repul, 'm-s', markersize=3)
+ax.set_xlabel('Step')
+ax.set_ylabel('Loss')
+ax.set_title('L_repulsion')
+ax.grid(True, alpha=0.3)
+ax.set_title('L_morpheme (direction consistency)')
+ax.grid(True, alpha=0.3)
+
+# f) norm loss component
+ax = axes[1, 2]
+if loss_log:
+    ll_norm = [d["norm"] for d in loss_log if d["step"] > 0]
+    ax.plot(ll_steps, ll_norm, 'orange', marker='o', markersize=3)
+ax.set_xlabel('Step')
+ax.set_ylabel('Loss')
+ax.set_title('L_norm')
+ax.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plot_path = RUN_DIR / "p3b_loss_curves.png"
+plt.savefig(plot_path, dpi=150, bbox_inches="tight")
+print(f"Plot saved: {plot_path}")
+plt.show()
+
+if train_data:
+    print(f"\nFinal train loss: {losses[-1]:.4f}")
+if val_data:
+    print(f"Final val loss: {v_losses[-1]:.4f}")
+    print(f"Best val loss: {min(v_losses):.4f}")
