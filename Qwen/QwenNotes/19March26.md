@@ -17,7 +17,7 @@ Resuming from `sentry_step_0440.pt` with `STEP_OFFSET=440`.
 | 250 | 278.96 | 19.89 | 6 |
 | 300 | 314.05 | 19.36 | 6 |
 | 350 | 268.07 | 19.17 | 7 |
-| 440+ | | | *resuming today, session 8* |
+| 400 | 256.77 | 18.80 | 8 |
 
 ### Session history
 
