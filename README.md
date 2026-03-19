@@ -123,8 +123,39 @@ Unfreeze embeddings with morpheme-aware regularisation. Uses decomposition data 
 * L_repulsion: Adversarial term preventing Wake token collapse
 * L_norm: Norm hygiene keeping Wake embeddings in distribution
 
-Scripts ready for TinyLlama (`wake2vec_phase_3_morpheme_v2.py`) and Llama (`wake2vec_llama_p3_morpheme.py`). Not yet run.
+**Composite loss:** `L_total = L_lm + λ_morph * L_morpheme + λ_device * L_device + λ_repulsion * L_repulsion + λ_norm * L_norm`
 
+Scripts ready for TinyLlama (`wake2vec_phase_3_morpheme_v2.py`) and Llama (`wake2vec_llama_p3_morpheme.py`).
+
+### Phase 3b: Geometric Refinement
+
+A follow-up to P3 with significantly stronger geometric lambdas, testing whether the auxiliary losses can compete with L_lm when amplified.
+
+| Parameter | P3 | P3b |
+|---|---|---|
+| Source | P2 step 1400 | P3 step 400 (best val) |
+| LR | 5e-5 | 2e-5 |
+| λ_morph | 0.1 | **50.0** (500x) |
+| λ_device | 0.05 | **2.0** (40x) |
+| Max steps | 3000 | 1000 |
+| Early stop patience | 5 | 3 |
+
+At P3b's lambdas, L_device contributed 12% of total loss (up from 0.3% in P3). The geometry signal was audible. It still didn't learn. See Key Findings below.
+
+### Key Findings (TinyLlama P3 Arc)
+
+**L_morph null result as evidence:** L_morph was pinned at 0.0002 across 2,000+ combined P3/P3b steps, never moving even under 500x lambda amplification. This proves P2 (attention routing via LoRA) implicitly learned morphological compositional structure — the morpheme decomposition the Wake demands was already encoded through language modelling alone, before explicit geometric pressure was applied.
+
+**L_device structural null:** The device triplet contrastive loss (clustering words by word-formation process — portmanteau, blend, compound, derivation, onomatopoeia) never left the 0.17–0.24 random walk range across two lambda regimes (0.05 and 2.0). The diagnosis: embeddings encode meaning and usage, not morphological construction method. A portmanteau of "river"+"run" should be near "river" and "run" in embedding space, not near a portmanteau of "chaos"+"cosmos". The loss was fighting the geometry it's built on — a direction problem, not a volume problem.
+
+**Alternative geometric objectives (future work):**
+- **Character n-gram overlap**: words sharing substrings pushed closer. Natural for embeddings, captures orthographic play.
+- **Phonological similarity**: words that rhyme or alliterate pushed closer. The Wake is deeply sonic.
+- **Source language clustering**: Wake words blend specific languages (German, Irish, Italian, Latin). Etymology may correlate with learnable character patterns.
+
+## Implication:
+
+*The computational "invisibility" of Wake's figuration may be because the structure is implicit in the language patterns themselves, not requiring explicit annotation to emerge in embedding space.*
 ---
 
 ## Qwen WakeOverlay Architecture
@@ -187,6 +218,20 @@ Qwen 2.5-14B uses a fundamentally different embedding strategy from the Llama/Ti
 | Seq len | 256 | 512 |
 | Steps | 3,000 | 3,000 |
 | Weight decay | 0.01 | 0.01 |
+
+### Phase 3 (Morpheme-Compositional Alignment)
+
+| | TinyLlama P3 | TinyLlama P3b |
+|---|---|---|
+| Source | P2 step 1400 | P3 step 400 (best val) |
+| LR | 5e-5 | 2e-5 |
+| λ_morph | 0.1 | 50.0 |
+| λ_device | 0.05 | 2.0 |
+| λ_repulsion | 0.05 | 0.05 |
+| λ_norm | 0.01 | 0.01 |
+| Max steps | 3,000 | 1,000 |
+| Early stop patience | 5 | 3 |
+| Outcome | L_morph/L_device flat. Best val 3.4188 @ step 400 | L_device still flat at 40x lambda. Early stop @ step 800 |
 
 ## Data
 
