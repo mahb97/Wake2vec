@@ -27,6 +27,8 @@ Resuming from checkpoint-2100. gap at 1.22 and climbing with 900 steps to go. be
 | 1900 | 3.14 | 4.32 | 1.18 | 6 |
 | 2000 | 3.12 | 4.33 | 1.22 | 6 |
 | 2100 | 3.09 | 4.35 | 1.26 | 6* |
+| 2200 | 3.07 | 4.36 | 1.30 | 7 |
+| 2300 | 3.08 | 4.38 | 1.30 | 7 |
 
 ## Llama 3.2-3B P1 session 1 (fresh start)
 
@@ -53,6 +55,13 @@ Wake injection: 44,195 new tokens added. vocab 128,256 → 172,451.
 | hidden_dim | 3,072 |
 
 **Data:** SEQ_LEN bumped to 512 (VRAM fine). Token sequence warning (457K > 131K max) is expected as this is cut into blocks, not feeding the full sequence.
+
+### P1 loss table
+
+| Step | Train | Val | Session |
+|------|-------|-----|---------|
+| 100 | 109.19 | 7.01 | 1 |
+
 
 the 1B is 1,000 steps from finishing P2, gap at 1.22, train flattening around 3.1, val creeping past 4.3. the interesting comparison is whether the stronger language priors of the bigger model resist or embrace the Wake token injection differently. the 1B inserted Wake tokens as embedded neologisms within Victorian prose but the 3B's deeper attention might integrate them more fluidly, or it might hold its priors tighter.
 
