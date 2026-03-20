@@ -29,6 +29,7 @@ Resuming from checkpoint-2100. gap at 1.22 and climbing with 900 steps to go. be
 | 2100 | 3.09 | 4.35 | 1.26 | 6* |
 | 2200 | 3.07 | 4.36 | 1.30 | 7 |
 | 2300 | 3.08 | 4.38 | 1.30 | 7 |
+| 2400 | 3.07 | 4.38 | 1.31 | 7 |
 
 ## Llama 3.2-3B P1 session 1 (fresh start)
 
