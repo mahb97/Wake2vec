@@ -15,7 +15,7 @@ Fine-tune LLMs on *Finnegans Wake* by injecting ~44K Joyce-specific tokens into 
 | TinyLlama 1.1B | 1.1B | **P1→P2→P3→P3b complete** | Done | P1: loss 8.46 → 0.079. P2: best val 0.6393. P3/P3b: geometric losses null — L_morph solved by P2, L_device structural null. Best ckpt: P3 step 400 (val 3.4188) |
 | Llama 3.2-1B | 1B | P1 complete, P2 running | P2 step 1900/3000 | P1: best val 5.36 @ step 1400. P2: train 3.14 / val 4.32 / gap 1.18 |
 | Qwen 2.5-14B | 14B | P1 running | Step 460/3000 | WakeOverlay arch, Adafactor, SEQ_LEN 128. Val 18.80, still dropping |
-| Llama 3.2-3B | 3B | P1 script ready | Not started | |
+| Llama 3.2-3B | 3B | P1 running | Session 1 | Gradient masking, AdamW, SEQ_LEN 256. 530M trainable params |
 | Llama 3.1-8B | 8B | P1 script ready | Not started | Biggest Llama that fits on free T4 |
 
 ---
@@ -73,7 +73,8 @@ This places new tokens at a consistent distance from the origin, near the surfac
 | Model | Base vocab | Wake tokens added | Total vocab |
 |---|---|---|---|
 | TinyLlama 1.1B | 32,000 | ~44,500 | ~76,500 |
-| Llama 3.2-1B | 128,256 | ~1,285 | ~129,541 |
+| Llama 3.2-1B | 128,256 | 44,195 | 172,451 |
+| Llama 3.2-3B | 128,256 | 44,195 | 172,451 |
 | Qwen 2.5-14B | 152,064 | 43,824 | 196,888 |
 
 ---
@@ -246,6 +247,7 @@ Block counts vary by model (different SEQ_LEN):
 |---|---|---|---|
 | TinyLlama 1.1B P1 | 256 | 1,566 | 174 |
 | Llama 3.2-1B P1 | 512 | ~800 | ~90 |
+| Llama 3.2-3B P1 | 256 | 802 | 90 |
 | Qwen 2.5-14B P1 | 128 | 3,221 | 358 |
 
 ## Embedding Analysis
