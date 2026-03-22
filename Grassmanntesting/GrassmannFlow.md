@@ -23,12 +23,4 @@ Character-level tokenization is deliberate. Joyce's morphological inventions in 
 - Project back to d=256
 - Sigmoid-gated fusion: alpha*h + (1-alpha)*gLinear reduction: d=256 -> r=32
 
-@misc{chong2025attentionneed,
-      title={Attention Is Not What You Need}, 
-      author={Zhang Chong},
-      year={2025},
-      eprint={2512.19428},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2512.19428}, 
-}
+Zhang, C. (2025). Attention Is Not What You Need: Grassmann Flows as an Attention-Free Alternative for Sequence Modeling. arXiv preprint arXiv:2512.19428. https://arxiv.org/abs/2512.19428
