@@ -15,6 +15,17 @@ Usage (Colab):
     mode = "train" | "generate" | "eval"
 
 Requires: torch (no bitsandbytes, no peft (pure PyTorch)
+
+Ref:
+@misc{chong2025attentionneed,
+      title={Attention Is Not What You Need}, 
+      author={Zhang Chong},
+      year={2025},
+      eprint={2512.19428},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2512.19428}, 
+}
 """
 
 # Colab Drive and imports
