@@ -46,7 +46,7 @@ Resuming from `checkpoint-150`.
 | Step | Train | Val | Session |
 |------|-------|-----|---------|
 | 100 | 109.19 | 7.01 | 1 |
-| 150+ | | | *resuming today, session 2* |
+| 200 | 97.27 | 6.75 | 2 |
 
 ## Notes
 
