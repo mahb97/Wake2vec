@@ -21,6 +21,7 @@ Resuming from `sentry_step_0640.pt` with `STEP_OFFSET=640`.
 | 450 | 284.28 | 18.42 | 8 |
 | 500 | 249.60 | 17.93 | 9 |
 | 550 | 260.29 | 17.74 | 10 |
+| 600 | 232.22 | 17.71 | 10 |
 
 ### Session history
 
