@@ -22,7 +22,7 @@ Resuming from `sentry_step_0720.pt` with `STEP_OFFSET=720`.
 | 500 | 249.60 | 17.93 | 9 |
 | 550 | 260.29 | 17.74 | 10 |
 | 600 | 232.22 | 17.71 | 10 |
-| 720+ | | | *resuming today, session 11* |
+| 650 | 256.27 | 17.67 | 11 |
 
 ### Session history
 
