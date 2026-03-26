@@ -364,3 +364,14 @@ the fact that the embeddings *work* at 1.50 norm despite base being at 0.99 is i
 **No spacing artifacts.** Unlike TinyLlama, Llama doesn't produce compound-fusing ("theshade", "haveheard"). The 128K base vocab already tokenises most word boundaries correctly. This confirms the TinyLlama spacing issue was a tokenisation boundary problem from the 32K vocab, not a model architecture issue.
 
 **Multi-sequence [1] is remarkable.** The Dromore Castle letter, the verse fragment, the Irish farewell cadence very much reads like a lost chapter of the Wake filtered through a Victorian letter-writing manual. "cupandnaggin", "thwackaway!", "queenlys signature", "soreen far away" are genuine Joycean inventions in context.
+
+---
+### The smaller model paradox
+
+TinyLlama (1.1B, 32K vocab) produces substantially more convincing Wake-style output than Llama 3.2-1B (1B, 128K vocab). TinyLlama's best outputs — "Woolwichleagues", "Oilinsquey", "twohandledduolandroom", "mooremooremurgessly", "purtybussesning" are genuine Joycean portmanteaux that could pass for authentic Wake coinages. Llama produces "Mr Sooty-Piggy", "Miss Mortherackenzie Wills", "Mr Raisethoverer" these are inventive but Victorian-comic, not Wakean.
+
+the explanation is the tokenizer. TinyLlama's 32K vocab forced ~44,500 Wake tokens to be added so the model had to build an entirely new embedding subspace for Joycean forms, learning their structure from scratch. Llama's 128K vocab already covered most English morphology, so only ~44,195 tokens were truly new (and many Wake forms partially overlap with existing subwords). the model falls back on its stronger English priors instead of inventing in Joyce's register.
+
+this is a counterintuitive finding: **a weaker base model with a smaller vocabulary produces better stylistic output because the tokenizer gap forces deeper embedding-level learning.** the constraint — not knowing English well enough — becomes the creative advantage as the model can't fall back on what it already knows, so it learns what Joyce actually does.
+
+this connects to the Wake itself. Joyce's language works precisely because it resists the reader's existing linguistic priors. a model that already "knows" English too well smooths over the strangeness. a model that has to learn everything from the embedding layer up preserves it, which suggests that Wake2Vec-style embedding injection may be most effective on models with smaller vocabularies that require maximal token injection, rather than on larger models where the base tokenizer already covers most of the target vocabulary. the optimal model for stylistic generation is not the most capable one, instead it's the one with the most to learn.
