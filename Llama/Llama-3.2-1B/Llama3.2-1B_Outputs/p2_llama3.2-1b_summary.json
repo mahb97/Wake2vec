@@ -1,0 +1,110 @@
+{
+  "model": "meta-llama/Llama-3.2-1B",
+  "phase": "P2_LoRA",
+  "p1_source": "/content/drive/MyDrive/wake2vec_llama_p1/full_checkpoints/step_1400",
+  "checkpoint": "final",
+  "vocab_size": 172451,
+  "dim": 2048,
+  "base_vocab": 128256,
+  "new_tokens": 44195,
+  "hyperparameters": {
+    "lr": 2e-05,
+    "warmup_ratio": 0.1,
+    "weight_decay": 0.01,
+    "max_steps": 3000,
+    "batch_size": 4,
+    "grad_accum": 4,
+    "lora_rank": 8,
+    "lora_alpha": 16,
+    "lora_targets": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "seq_len": 512
+  },
+  "norms": {
+    "global": {
+      "mean": 1.1196013689041138,
+      "std": 0.23978325724601746,
+      "min": 0.5442078709602356,
+      "max": 1.5881017446517944
+    },
+    "base": {
+      "mean": 0.9870073199272156,
+      "std": 0.09309908002614975
+    },
+    "new": {
+      "mean": 1.504395842552185,
+      "std": 0.01052037626504898
+    },
+    "welch_t": {
+      "t": -1954.3709714400386,
+      "p": 0.0
+    },
+    "mann_whitney_u": {
+      "U": 0.0,
+      "p": 0.0
+    },
+    "cohens_d": -7.8096418380737305
+  },
+  "isotropy": {
+    "all": {
+      "score": 0.9506748914718628,
+      "mean_cos": 0.0011194163234904408,
+      "n": 5000
+    },
+    "base": {
+      "score": 0.9829611778259277,
+      "mean_cos": 8.699934551259503e-05,
+      "n": 5000
+    },
+    "new": {
+      "score": 0.9979074597358704,
+      "mean_cos": -2.182300522690639e-05,
+      "n": 5000
+    }
+  },
+  "pairwise_cosine": {
+    "base_base": {
+      "mean": 0.13168767094612122,
+      "std": 0.06313939392566681
+    },
+    "new_new": {
+      "mean": 0.002807986456900835,
+      "std": 0.022788992151618004
+    },
+    "base_new": {
+      "mean": 0.002815814921632409,
+      "std": 0.022398414090275764
+    },
+    "ks_test_bb_vs_nn": {
+      "D": 0.9018274137068534,
+      "p": 0.0
+    }
+  },
+  "intrinsic_dim": {
+    "base_90pct": 101,
+    "base_95pct": 101,
+    "new_90pct": 101,
+    "new_95pct": 101,
+    "base_top1_var": 0.013801200315356255,
+    "new_top1_var": 0.002105769468471408
+  },
+  "loss": {
+    "final_train": 3.02932373046875,
+    "final_eval": 4.39316987991333,
+    "best_eval": 4.040464401245117
+  },
+  "drift": {
+    "base_cosine_mean": 1.0,
+    "base_cosine_std": 7.399171408906113e-08,
+    "base_l2_mean": 0.0,
+    "wake_cosine_mean": 1.0,
+    "wake_cosine_std": 7.498938714434189e-08,
+    "wake_l2_mean": 0.0
+  }
+}
