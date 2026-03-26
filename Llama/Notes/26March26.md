@@ -28,7 +28,7 @@ Resuming from `checkpoint-2900`.
 | 1800 | 3.14 | 4.30 | 1.16 | 6 |
 | 1900 | 3.14 | 4.32 | 1.18 | 6 |
 | 2000 | 3.12 | 4.33 | 1.22 | 6 |
-| 2100 | 3.09 | 4.35 | 1.26 | 6* |
+| 2100 | 3.09 | 4.35 | 1.26 | 6 |
 | 2200 | 3.07 | 4.36 | 1.30 | 7 |
 | 2300 | 3.08 | 4.38 | 1.30 | 7 |
 | 2400 | 3.07 | 4.38 | 1.31 | 7 |
@@ -39,11 +39,17 @@ Resuming from `checkpoint-2900`.
 | 2900 | 3.04 | 4.39 | 1.35 | 8 |
 | 3000 | 3.03 | 4.39 | 1.36 | 9 |
 
+### P3 loss table
+
+| Step | L_total | L_lm | L_morph | L_device | Val | Early stop |
+|------|---------|------|---------|----------|-----|------------|
+| 0 | 3.8597 | 3.4387 | 0.0007 | 0.1933 | — | — |
+
 ---
 
 ## Llama P3 preparation
 
-P3 script ready: `wake2vec_llama_p3_strong.py`. Based on TinyLlama P3b template with strong lambdas and skipping weak lambdas entirely this time based on TinyLlama null result.
+P3 script ready: `wake2vec_llama_p3_strong.py`. Based on TinyLlama P3b template with strong lambdas — skipping weak lambdas entirely based on TinyLlama null result.
 
 | Param | Value | Rationale |
 |-------|-------|-----------|
@@ -56,18 +62,71 @@ P3 script ready: `wake2vec_llama_p3_strong.py`. Based on TinyLlama P3b template 
 | Vectorized losses | Yes | MorphemeIndex (scatter_add_), DeviceIndex (group loops) |
 | Eval spam fix | Yes | model.training guard |
 
-does a different architecture produce the same L_device null?? if yes, it's universal, but if no, it's architecture-dependent.
+the question: does a different architecture produce the same L_device null? if yes, it's universal. if no, it's architecture-dependent. either way, it's a finding.
+
+---
+
+## Llama 3.2-1B P3 session 1 (fresh start from P2 step 500)
+
+this one brought a surprise: **L_morph = 0.0007**, not 0.0002 like TinyLlama. Llama P2 didn't fully solve morpheme composition. there's actual gradient signal here, so this is the cross-architecture finding.
+
+### Loss contribution at step 0
+
+| Component | Raw | Lambda | Contribution | % of total |
+|-----------|-----|--------|-------------|------------|
+| L_lm | 3.86 | 1.0 | 3.86 | 76.3% |
+| L_device | 0.19 | 2.0 | 0.39 | 7.7% |
+| **L_morph** | **0.0007** | 50.0 | **0.035** | **0.7%** |
+| L_norm | 0.18 | 0.01 | 0.002 | ~0% |
+| L_repulsion | 0.00 | 0.05 | 0.000 | 0% |
+
+morph contribution is **double** TinyLlama's at the same lambdas (0.7% vs 0.3%). the smaller model paradox extends to training: TinyLlama's 32K vocab forced it to learn morpheme composition so thoroughly during P2 that P3 had nothing left. Llama's 128K vocab let it take shortcuts, leaving residual morpheme error for P3 to find.
+
+**watch L_morph.** if it drops from 0.0007, Llama P3 is doing something TinyLlama P3 never could.
+
+### P3 config
+
+| Param | Value |
+|-------|-------|
+| Source | P2 step 500 (best val 4.04) |
+| LR | 2e-5 |
+| λ_morph | 50.0 |
+| λ_device | 2.0 |
+| Max steps | 1000 |
+| Early stop patience | 5 |
+| SEQ_LEN | 512 |
+| Train/Val | 644 / 72 blocks |
+| Trainable | 358M (Wake embed rows + LoRA) |
 
 ---
 
 ## Status
-
 | Model | Phase | Status | Notes |
 |-------|-------|--------|-------|
 | TinyLlama 1.1B | P3b | Complete | Geometric null. Best: P3 step 400 (val 3.4188) |
-| **Llama 3.2-1B** | **P2** | **Final session** | **done,P3 next** |
-| Llama 3.2-3B | P1 | Running | Step 400/3000, val 6.70 |
-| Qwen 2.5-14B | P1 | Paused | Session 11, step ~720, val ~17.65 |
+| **Llama 3.2-1B** | **P3** | **Running** | **L_morph=0.0007! Watch this one.** |
+| Llama 3.2-3B | P1 | Running | Step 500/3000, val 6.72 |
+| Qwen 2.5-14B | P1 | Paused | Session 11, step ~800, val ~17.47 |
+
+## Notes
+
+L_morph = 0.0007 is the most interesting number in the project right now. if it drops, it proves the tokenizer gap hypothesis: models with larger vocabularies retain learnable morpheme structure because P2 didn't need to solve it as completely. if it stays flat like TinyLlama, the null result is universal. either way, it's a finding.
+
+---
+
+## Llama 3.2-3B P1 session 4 (continuing)
+
+### P1 loss table (continued)
+
+| Step | Train | Val | Session |
+|------|-------|-----|---------|
+| 100 | 109.19 | 7.01 | 1 |
+| 200 | 97.27 | 6.75 | 2 |
+| 300 | 87.04 | 6.68 | 3 |
+| 400 | 79.07 | 6.70 | 3 |
+| 500 | 72.80 | 6.72 | 4 |
+
+val flattening around 6.7 (6.68 → 6.70 → 6.72). train still dropping (87 → 73). watching for plateau.
 
 ---
 This one maybe, sun in Dublin, coming soon lol: [Dance in the Sunlight](https://soundcloud.com/lo-freq-1/dance-in-the-sunlight-feat?in=houseof_kyri/sets/oh-my-dubs-what-is-you-saying&si=5619c8b8a98c4edeb5634d1ada769751&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing)
