@@ -37,7 +37,7 @@ Resuming from `checkpoint-2900`.
 | 2700 | 3.05 | 4.39 | 1.34 | 8 |
 | 2800 | 3.04 | 4.39 | 1.36 | 8 |
 | 2900 | 3.04 | 4.39 | 1.35 | 8 |
-| 2900+ | | | | *resuming today, session 9 (final)* |
+| 3000 | 3.03 | 4.39 | 1.36 | 9 |
 
 ---
 
@@ -65,7 +65,7 @@ does a different architecture produce the same L_device null?? if yes, it's univ
 | Model | Phase | Status | Notes |
 |-------|-------|--------|-------|
 | TinyLlama 1.1B | P3b | Complete | Geometric null. Best: P3 step 400 (val 3.4188) |
-| **Llama 3.2-1B** | **P2** | **Final session** | **100 steps from done → P3 next** |
+| **Llama 3.2-1B** | **P2** | **Final session** | **done,P3 next** |
 | Llama 3.2-3B | P1 | Running | Step 400/3000, val 6.70 |
 | Qwen 2.5-14B | P1 | Paused | Session 11, step ~720, val ~17.65 |
 
