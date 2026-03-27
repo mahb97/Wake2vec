@@ -13,7 +13,7 @@ Fine-tune LLMs on *Finnegans Wake* by injecting ~44K Joyce-specific tokens into 
 | Model | Params | Phase | Status | Notes |
 |---|---|---|---|---|
 | TinyLlama 1.1B | 1.1B | **P1→P2→P3→P3b complete** | Done | P1: loss 8.46 → 0.079. P2: best val 0.6393. P3/P3b: geometric losses null — L_morph solved by P2, L_device structural null. Best ckpt: P3 step 400 (val 3.4188) |
-| Llama 3.2-1B | 1B | P1 complete, P2 running | P2 step 1900/3000 | P1: best val 5.36 @ step 1400. P2: train 3.14 / val 4.32 / gap 1.18 |
+| Llama 3.2-1B | 1B | P1 & P2 complete, P3 running | P3 step 200/1000 | P1: best val 5.36 @ step 1400. P2 best step was 500 |
 | Qwen 2.5-14B | 14B | P1 running | Step 460/3000 | WakeOverlay arch, Adafactor, SEQ_LEN 128. Val 18.80, still dropping |
 | Llama 3.2-3B | 3B | P1 running | Session 1 | Gradient masking, AdamW, SEQ_LEN 256. 530M trainable params |
 | Llama 3.1-8B | 8B | P1 script ready | Not started | Biggest Llama that fits on free T4 |
