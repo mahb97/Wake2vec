@@ -26,7 +26,8 @@ Resuming from `sentry_step_0800.pt` with `STEP_OFFSET=800`.
 | 700 | 226.89 | 17.65 | 11 |
 | 750 | 230.28 | 17.59 | 11 |
 | 800 | 236.24 | 17.47 | 11 |
-| 800+ | | | *resuming today, session 12* |
+| 850 | 254.27 | 17.41 | 12 |
+
 
 ### Session history
 
