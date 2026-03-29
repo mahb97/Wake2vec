@@ -28,6 +28,7 @@ Resuming from `sentry_step_0880.pt` with `STEP_OFFSET=880`.
 | 800 | 236.24 | 17.47 | 11 |
 | 850 | 254.27 | 17.41 | 12 |
 | 900 | 249.58 | 17.18 | 13 |
+| 950 | 216.40 | 17.12 | 13 |
 
 ### Session history
 
