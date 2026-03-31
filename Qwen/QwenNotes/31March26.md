@@ -29,7 +29,7 @@ Resuming from `sentry_step_0960.pt` with `STEP_OFFSET=960`.
 | 850 | 254.27 | 17.41 | 12 |
 | 900 | 249.58 | 17.18 | 13 |
 | 950 | 216.40 | 17.12 | 13 |
-| 960+ | | | *resuming today, session 14* |
+| 1000 | 214.00 | 16.95 | 14 |
 
 ### Session history
 
