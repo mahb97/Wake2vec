@@ -62,6 +62,29 @@ Animated orbs representing temperature or device options, with live text reflow.
 - Temperature sweep as animation: 0.5 → 1.2, watch text transform
 
 ---
+## 5. The Dissolving Book Token Puddle (kinda cute)
+
+**Concept:** An open book on screen displaying generated Wake paragraphs. Click anywhere on the page and the words fall from the book (gravity, tumbling, scattering) into a wet puddle of language pooling at the bottom of the screen.
+
+**The key mechanic:** The sentences are strings. Each word remains connected to its neighbours by a visible thread. the probabilistic chain that generated them. Click a word in the puddle and pull the string upward: the connected words follow, dragging behind like fish on a line. Drop them back onto the page and they snap into new positions. The reader recomposes Joyce from the model's raw output.
+
+**What it means:**
+- The generated text appears as coherent prose, invoking the illusion of authorship
+- Click and the illusion dissolves and tokens become visible as tokens, individual units on probability strings
+- The puddle is the latent space made physical: a pool of disconnected potential
+- Pulling words back up = recomposition, the reader becomes author
+- The strings = attention patterns, token dependencies, the invisible architecture that holds language together
+- Rearranging on the page = what Joyce did with language, what Wake2Vec does with embeddings: taking apart and reassembling
+
+**Technical approach:**
+- Matter.js or similar for 2D physics (gravity, rigid body words, fluid-like pooling)
+- Pretext for text measurement and page layout
+- Words as physics objects connected by spring constraints (visible strings)
+- Click-and-drag with string tension, connected words follow with slight delay
+- Snap-to-grid on the page for recomposition
+- Could save reader-composed arrangements for collaborative Wake rewriting
+
+---
 
 ## Tech Notes
 
@@ -71,4 +94,5 @@ Animated orbs representing temperature or device options, with live text reflow.
 - Could build on existing `dataviz_p1_embeds.py` for data pipeline, Pretext for frontend
 
 See [Pretext](https://github.com/chenglou/pretext)
+
 ---
