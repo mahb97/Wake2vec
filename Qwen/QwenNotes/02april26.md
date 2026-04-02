@@ -31,7 +31,7 @@ Resuming from `sentry_step_1040.pt` with `STEP_OFFSET=1040`.
 | 950 | 216.40 | 17.12 | 13 |
 | 1000 | 213.99 | 16.95 | 14 |
 | 1050 | 210.99 | 16.90 | 14 |
-| 1040+ | | | *resuming today, session 15* |
+| 1100 | 206.32 | 16.80 | 15 |
 
 ### Session history
 
