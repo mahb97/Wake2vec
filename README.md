@@ -14,10 +14,10 @@ Fine-tune LLMs on *Finnegans Wake* by injecting ~44K Joyce-specific tokens into 
 |---|---|---|---|---|
 | TinyLlama 1.1B | 1.1B | **P1→P2→P3→P3b complete** | Done | P1: loss 8.46 → 0.079. P2: best val 0.6393. P3/P3b: geometric losses null — L_morph solved by P2, L_device structural null. Best ckpt: P3 step 400 (val 3.4188) |
 | Llama 3.2-1B | 1B | P1 & P2 complete, P3 dying | P3 step 750/1000 | P3: L_morph=0.0007 (3.5x TinyLlama) but never moved. L_device flat. Same null, different baseline. |
-| Llama 3.2-3B | 3B | P1 running | Step 700/3000 | Gradient masking, AdamW, SEQ_LEN 512. Val 6.77, plateauing ~6.7 |
+| Llama 3.2-3B | 3B | P1 running | Step 900/3000 | Gradient masking, AdamW, SEQ_LEN 512. Val 6.77, plateauing ~6.7 |
 | Llama 3.1-8B | 8B | P1 script ready | Not started | Biggest Llama that fits on free T4. Next on account 2 |
-| Mistral 7B v0.3 | 7B | P1 starting | Session 1 | Sliding window attention, 32K vocab (+44,553 Wake tokens), SEQ_LEN 256 |
-| Qwen 2.5-14B | 14B | P1 running | Step 1000/3000 | WakeOverlay arch, Adafactor, SEQ_LEN 128. Val 16.95, still dropping |
+| Mistral 7B v0.3 | 7B | P1 at 250/3000 | Session 1 | Sliding window attention, 32K vocab (+44,553 Wake tokens), SEQ_LEN 256 |
+| Qwen 2.5-14B | 14B | P1 running | Step 1150/3000 | WakeOverlay arch, Adafactor, SEQ_LEN 128. Val 16.95, still dropping |
 | Phi-3 Mini | 3.8B | P1 script pending | Not started | "Textbook quality" training data. Next on account 3 |
 | Gemma 2 9B | 9B | P1 script pending | Not started | Google architecture. Next on account 4 |
 
