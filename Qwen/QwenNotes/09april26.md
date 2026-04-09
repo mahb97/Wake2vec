@@ -32,7 +32,7 @@ Resuming from `sentry_step_1120.pt` with `STEP_OFFSET=1120`.
 | 1000 | 213.99 | 16.95 | 14 |
 | 1050 | 210.99 | 16.90 | 14 |
 | 1100 | 206.32 | 16.80 | 15 |
-| 1120+ | | | *resuming today, session 16* |
+| 1150 | 206.06 | 16.67 | 16 |
 
 ### Session history
 
