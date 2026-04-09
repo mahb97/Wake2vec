@@ -1,0 +1,193 @@
+{
+  "model": "meta-llama/Llama-3.2-1B",
+  "phase": "P3_morpheme_strong_lambdas",
+  "p2_source": "/content/drive/MyDrive/wake2vec_llama_p2_lora/full_checkpoints/step_0500",
+  "checkpoint": "final",
+  "vocab_size": 172451,
+  "dim": 2048,
+  "base_vocab": 128256,
+  "new_tokens": 44195,
+  "hyperparameters": {
+    "lr": 2e-05,
+    "warmup_ratio": 0.1,
+    "weight_decay": 0.01,
+    "max_steps": 1000,
+    "batch_size": 4,
+    "grad_accum": 4,
+    "lora_rank": 8,
+    "lora_alpha": 16,
+    "lora_targets": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "seq_len": 512,
+    "lambda_morph": 50.0,
+    "lambda_device": 2.0,
+    "device_triplets": 64,
+    "device_margin": 0.2,
+    "lambda_repulsion": 0.05,
+    "lambda_norm": 0.01,
+    "repulsion_threshold": 0.95,
+    "early_stop_patience": 5,
+    "min_group_size": 3
+  },
+  "morpheme_stats": {
+    "source": "wake_embedding_groups.jsonl",
+    "num_groups": 196,
+    "total_pairs": 5924,
+    "wake_tokens_with_morphemes": 1834
+  },
+  "device_stats": {
+    "source": "device_groups.jsonl",
+    "num_groups": 5,
+    "total_words": 2123,
+    "groups": {
+      "nonce": 757,
+      "malapropism": 690,
+      "portmanteau": 465,
+      "foreign": 150,
+      "pun": 61
+    }
+  },
+  "norms": {
+    "global": {
+      "mean": 1.1196187734603882,
+      "std": 0.23981085419654846,
+      "min": 0.5442078709602356,
+      "max": 1.58835768699646
+    },
+    "base": {
+      "mean": 0.9870073199272156,
+      "std": 0.09309908002614975
+    },
+    "new": {
+      "mean": 1.50446355342865,
+      "std": 0.01049658190459013
+    },
+    "welch_t": {
+      "t": -1954.7845597772198,
+      "p": 0.0
+    },
+    "mann_whitney_u": {
+      "U": 0.0,
+      "p": 0.0
+    },
+    "cohens_d": -7.810886383056641
+  },
+  "isotropy": {
+    "all": {
+      "score": 0.9507396817207336,
+      "mean_cos": 0.0011173768434673548,
+      "n": 5000
+    },
+    "base": {
+      "score": 0.9829611778259277,
+      "mean_cos": 8.699934551259503e-05,
+      "n": 5000
+    },
+    "new": {
+      "score": 0.9979066848754883,
+      "mean_cos": -2.1852751160622574e-05,
+      "n": 5000
+    }
+  },
+  "pairwise_cosine": {
+    "base_base": {
+      "mean": 0.13168767094612122,
+      "std": 0.06313939392566681
+    },
+    "new_new": {
+      "mean": 0.0027134246192872524,
+      "std": 0.02278628945350647
+    },
+    "base_new": {
+      "mean": 0.002839174121618271,
+      "std": 0.022389478981494904
+    },
+    "ks_test_bb_vs_nn": {
+      "D": 0.9020675337668834,
+      "p": 0.0
+    }
+  },
+  "intrinsic_dim": {
+    "base_90pct": 101,
+    "base_95pct": 101,
+    "new_90pct": 101,
+    "new_95pct": 101,
+    "base_top1_var": 0.013801200315356255,
+    "new_top1_var": 0.0020927535369992256
+  },
+  "morpheme_direction_analysis": {
+    "top_5_consistent": [
+      {
+        "morpheme": "-fication",
+        "mean_cosine": 0.94140625,
+        "n_pairs": 3
+      },
+      {
+        "morpheme": "-head",
+        "mean_cosine": 0.85546875,
+        "n_pairs": 3
+      },
+      {
+        "morpheme": "-wards",
+        "mean_cosine": 0.75,
+        "n_pairs": 3
+      },
+      {
+        "morpheme": "-aster",
+        "mean_cosine": 0.7265625,
+        "n_pairs": 3
+      },
+      {
+        "morpheme": "-ein",
+        "mean_cosine": 0.72265625,
+        "n_pairs": 3
+      }
+    ],
+    "bottom_5_consistent": [
+      {
+        "morpheme": "be-",
+        "mean_cosine": 0.185546875,
+        "n_pairs": 61
+      },
+      {
+        "morpheme": "-er",
+        "mean_cosine": 0.1552734375,
+        "n_pairs": 244
+      },
+      {
+        "morpheme": "-y",
+        "mean_cosine": 0.15234375,
+        "n_pairs": 405
+      },
+      {
+        "morpheme": "-ed",
+        "mean_cosine": 0.1376953125,
+        "n_pairs": 419
+      },
+      {
+        "morpheme": "-s",
+        "mean_cosine": 0.1142578125,
+        "n_pairs": 1034
+      }
+    ]
+  },
+  "drift": {
+    "base_cosine_mean": 1.0,
+    "base_cosine_std": 7.399171408906113e-08,
+    "base_l2_mean": 0.0,
+    "wake_cosine_mean": 0.9999212622642517,
+    "wake_cosine_std": 0.00011001142411259934,
+    "wake_l2_mean": 0.01578420400619507
+  },
+  "loss": {
+    "final_train": 14.53937744140625,
+    "final_eval": 4.63593053817749,
+    "best_eval": 4.481925964355469
+  }
+}
