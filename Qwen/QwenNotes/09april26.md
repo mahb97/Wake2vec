@@ -51,4 +51,4 @@ Resuming from `sentry_step_1120.pt` with `STEP_OFFSET=1120`.
 | Run 13 | 0–80 | 880–960 | |
 | Run 14 | 0–80 | 960–1040 | |
 | Run 15 | 0–80 | 1040–1120 | |
-| Run 16 | 0–? | 1120–? | *today* |
+| Run 16 | 0–80 | 1120–1200 | *today* |
