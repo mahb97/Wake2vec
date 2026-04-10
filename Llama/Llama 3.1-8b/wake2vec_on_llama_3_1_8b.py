@@ -1,17 +1,44 @@
 # -*- coding: utf-8 -*-
-"""wake2vec_on_llama_3_1_8b.py
+"""Wake2Vec Phase 1: Llama-3.1-8B Embedding-Only Fine-Tune
 
 # Wake2Vec P1: Llama-3.1-8B Embedding-Only with Gradient Masking
 
 **Model:** meta-llama/Llama-3.1-8B (4-bit quantized)
-**Hardware:** Google Colab T4 GPU (15GB VRAM)
+**Hardware:** Google Colab T4 GPU (2026.02)
 **Training data:** Finnegans Wake corpus + Wake lexicon
 
-Biggest Llama that fits on a free T4. VRAM budget is tight (~9-10GB)
-so we run batch=1, seq_len=256, gradient checkpointing ON.
+## Overview
 
-Llama 3.1-8B specs: 32 layers, hidden_size=4096, 32 attn heads, 8 KV heads
-Same vocab as 3.2 family (128,256) so Wake injection is identical.
+Phase 1 embedding-only fine-tuning. Wake tokens are injected into the
+Llama-3.1-8B vocabulary and initialised using a two-tier strategy:
+  1. Compositional init: Wake words with known morpheme decomposition
+     are initialised from their component embeddings (prefix/root/suffix).
+  2. Spherical init: remaining Wake words get random directions at 1.0x
+     base radius (not 1.5x — learned from TinyLlama/Llama 1B norm gap).
+
+Only the new Wake token embedding rows receive gradients (base rows
+masked to zero). A frozen LoRA r=1 adapter on q_proj is included for
+PEFT compatibility with quantized training but contributes no trainable
+parameters.
+
+The model trains on both the Finnegans Wake corpus and the Wake lexicon
+file directly, giving the embeddings exposure to tokens both in context
+and in isolation.
+
+Based on the Llama-3.2-3B script. Main differences:
+- 8B model: 32 layers, hidden_size=4096, 32 attn heads, 8 KV heads
+- Same vocab (128,256) so Wake injection is identical
+- ~4GB heavier at 4-bit. Tight on T4 VRAM (~8-9GB for model body)
+- Starting with SEQ_LEN=512. May need to reduce to 256 or 128 if OOM
+  This is the biggest Llama that fits on free T4.
+
+## Colab 2026.02 compatibility
+- Triton shim for bnb 0.45.0 / triton 3.x
+- No pip installs needed (bnb, scikit-learn, scipy pre-installed)
+- eval_strategy (not evaluation_strategy) for transformers 5.0.0
+- No os.sync() calls (Drive FUSE handles sync internally)
+
+-------------------------------------------------------------
 """
 
 # envi
@@ -59,6 +86,7 @@ BASE_VOCAB = 128256
 
 FW_TEXT = "/content/FW_TEXT.txt"
 WAKE_LEXICON = "/content/wake_lexicon.txt"
+MORPHEME_JSONL = "/content/wake_embedding_groups.jsonl" 
 
 RUN_DIR = Path("/content/drive/MyDrive/wake2vec_llama8b_p1")
 LOCAL_RUN = Path("/content/runs/wake2vec_llama8b_p1")
@@ -75,7 +103,7 @@ WARMUP_STEPS = max(20, MAX_STEPS // 20)
 WEIGHT_DECAY = 0.0
 BATCH_SIZE = 1
 GRAD_ACCUM = 16
-SEQ_LEN = 256                # keep short (VRAM is tight on 8B)
+SEQ_LEN = 256                # at 512 it was 199 seconds per step 
 SAVE_STEPS = 50              # gaslight GPU
 LOG_STEPS = 50
 EVAL_STEPS = 200
@@ -187,33 +215,102 @@ peft_cfg = LoraConfig(
 )
 model = get_peft_model(model, peft_cfg)
 
+# freeze everything
 for n, p in model.named_parameters():
     p.requires_grad = False
 
-# wake embed injection
+# resize embeds for Wake vocab
 old_vocab = model.get_input_embeddings().weight.shape[0]
-model.resize_token_embeddings(len(tok))
+model.resize_token_embeddings(len(tok), mean_resizing=False)
 wte = model.get_input_embeddings()
 
+# tie input/output
 if hasattr(model, "lm_head"):
     model.lm_head.weight = wte.weight
 
+# embedding initialisation: compositional init for Wake words with morpheme decomposition & spherical init at 1.0x base radius for the rest
+# Learned from TinyLlama/Llama 1B: 1.5x radius creates a norm gap (Wake at 1.50, base at 0.99) that never closes. 1.0x avoids this.
+
 with torch.no_grad():
-    base = wte.weight[:old_vocab]
-    dim = base.shape[1]
-    std = base.std().item()
+    base_emb = wte.weight[:old_vocab]
+    dim = base_emb.shape[1]
+    std = base_emb.std().item()
     base_radius = std * math.sqrt(dim)
-    target_radius = 1.5 * base_radius
+    target_radius = 1.0 * base_radius  # 1.0x, not 1.5x
+
+    # spherical init for ALL new tokens
     if num_added > 0:
         new = torch.randn((num_added, dim), device=wte.weight.device)
         new = new / (new.norm(dim=1, keepdim=True) + 1e-8) * target_radius
         wte.weight.data[old_vocab:old_vocab + num_added] = new
 
-print(f"  Vocab: {old_vocab} -> {len(tok)} (+{num_added} Wake tokens)")
-print(f"  Spherical init radius: {target_radius:.4f}")
+    # override with compositional init where morpheme data exists
+    comp_count = 0
+    comp_alpha = 0.15  # weight for prefix/suffix components
 
+    if os.path.exists(MORPHEME_JSONL):
+        print("  Loading morpheme groups for compositional init...")
+        import json as _json
+        with open(MORPHEME_JSONL, 'r') as f:
+            morph_groups = [_json.loads(line) for line in f]
+
+        # build a map: wake_word -> (morpheme, bases)
+        word_to_base = {}
+        for g in morph_groups:
+            morpheme = g["morpheme"]
+            morph_type = g["morpheme_type"]
+            examples = g["examples"]
+            bases = g["bases"]
+            for word, base_word in zip(examples, bases):
+                if word not in word_to_base:
+                    word_to_base[word] = base_word
+
+        # load lexicon for word-to-index mapping
+        with open(WAKE_LEXICON, 'r', encoding='utf-8') as _lf:
+            _wake_words = [line.strip() for line in _lf if line.strip()]
+
+        # for each Wake token that has a known base, compose the init
+        for i, wake_word in enumerate(_wake_words):
+            if i >= num_added:
+                break
+            if wake_word not in word_to_base:
+                continue
+
+            base_word = word_to_base[wake_word]
+
+            # tokenize the base word
+            base_ids = tok(base_word, add_special_tokens=False)["input_ids"]
+            if not base_ids:
+                continue
+
+            # get mean embed of base word's tokens
+            base_vecs = wte.weight[base_ids]
+            base_mean = base_vecs.mean(dim=0)
+
+            # mostly base meaning, small noise for diversity
+            noise = torch.randn(dim, device=wte.weight.device) * std * 0.1
+            composed = base_mean + noise
+
+            # norm to target radius
+            composed = composed / (composed.norm() + 1e-8) * target_radius
+
+            wte.weight.data[old_vocab + i] = composed
+            comp_count += 1
+
+        print(f"  Compositional init: {comp_count} tokens from morpheme bases")
+    else:
+        print(f"  Morpheme file not found: {MORPHEME_JSONL}")
+        print(f"  Using spherical init for all tokens")
+
+spherical_count = num_added - comp_count
+print(f"  Vocab: {old_vocab} -> {len(tok)} (+{num_added} Wake tokens)")
+print(f"  Init: {comp_count} compositional + {spherical_count} spherical")
+print(f"  Spherical radius: {target_radius:.4f} (1.0x base, not 1.5x)")
+
+# enable grad on embeddings only
 wte.weight.requires_grad = True
 
+# grad masking, zero out base vocab rows
 new_rows = torch.arange(old_vocab, old_vocab + num_added, device=wte.weight.device) if num_added > 0 else None
 base_rows = torch.arange(0, old_vocab, device=wte.weight.device)
 
@@ -226,13 +323,14 @@ def mask_grad(grad):
 wte.weight.register_hook(mask_grad)
 
 trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-print(f"  Trainable params: {trainable:,}")
-print(f"  VRAM after setup: {torch.cuda.memory_allocated(0) / 1e9:.2f} GB")
+print(f"  Trainable params: {trainable:,} (Wake embedding rows only)")
+print(f"  Gradient masking: ENABLED (base {old_vocab} rows frozen)")
 
 # pre-training snapshot 
 E_pre = wte.weight.detach().cpu().clone()
 torch.save(E_pre, RUN_DIR / "embeddings_pre.pt")
-print(f"  Pre-training snapshot saved: {E_pre.shape}")
+print(f"  Saved: {RUN_DIR / 'embeddings_pre.pt'}")
+print(f"  Shape: {E_pre.shape}")
 
 # callbacks
 import shutil, time
@@ -362,13 +460,16 @@ trainer = EmbOnlyTrainer(
     model=model, args=args,
     train_dataset=train_ds, eval_dataset=val_ds,
     data_collator=None,
-    callbacks=[EmbeddingSnapshot(), FullCheckpoint(), SentryMirror(),
-               LossMonitor(), StepTimer()],
+    callbacks=[EmbeddingSnapshot(), 
+               FullCheckpoint(),
+               SentryMirror(),
+               LossMonitor(), 
+               StepTimer()
+    ],
 )
 
 print("=" * 60)
-print("WAKE2VEC P1: Llama-3.1-8B EMBEDDING-ONLY")
-print("=" * 60)
+print("Wake2Vec P1: Llama-3.1-8B Embedding-Only with Gradient Masking")
 print(f"  Train: {len(train_ds)} blocks | Val: {len(val_ds)} blocks")
 print(f"  Steps: {MAX_STEPS} | Effective batch: {BATCH_SIZE * GRAD_ACCUM}")
 print(f"  VRAM before training: {torch.cuda.memory_allocated(0) / 1e9:.2f} GB")
@@ -390,11 +491,14 @@ print(f"\nTRAINING COMPLETE ({elapsed:.1f} minutes)")
 # save final 
 final_dir = RUN_DIR / "final"
 final_dir.mkdir(exist_ok=True)
+
 model.save_pretrained(str(final_dir))
 tok.save_pretrained(str(final_dir))
+
 final_emb = wte.weight.detach().cpu()
 torch.save(final_emb, final_dir / "embeddings.pt")
 os.sync()
+
 print(f"Final model saved to {final_dir}")
 
 # loss curve 
