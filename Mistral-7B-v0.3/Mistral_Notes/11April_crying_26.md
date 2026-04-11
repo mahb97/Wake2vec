@@ -17,7 +17,7 @@ Resuming from `checkpoint-300`.
 | 200 | 172.47 | 11.12 | 2/3 |
 | 250 | 164.99 | 11.07 | 2/3 |
 | 300 | 163.94 | 10.99 | 3 |
-| 300+ | | | *resuming today, session 4* |
+| 350 | 159.78 | 10.99 | 4 |
 
 ### The Mistral question
 
