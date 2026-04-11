@@ -39,7 +39,7 @@ Resuming from `sentry_step_1220.pt` with `STEP_OFFSET=1220`.
 | 1100 | 206.32 | 16.80 | 15 |
 | 1150 | 206.06 | 16.67 | 16 |
 | 1200 | 200.33 | 16.65 | 16 |
-| 1220+ | | | *session 17. she persists.* |
+| 1250 | 204.93 | 16.41 | 17 |
 
 ### Session history (abridged because at this point who's counting)
 
