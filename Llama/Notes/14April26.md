@@ -12,7 +12,7 @@ Resuming from `checkpoint-150`.
 
 | Step | Train | Val | Session |
 |------|-------|-----|---------|
-
+| 200 | 195.78 | 12.57 | 3 |
 
 ---
 
