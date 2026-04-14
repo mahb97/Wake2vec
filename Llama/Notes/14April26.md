@@ -14,6 +14,19 @@ Resuming from `checkpoint-150`.
 |------|-------|-----|---------|
 | 200 | 195.78 | 12.57 | 3 |
 
+
+For comparison:
+
+| Model | Params | Vocab | Val @ step 200 |
+|-------|--------|-------|----------------|
+| TinyLlama | 1.1B | 32K | ~20.50 |
+| Llama 1B | 1B | 128K | 4.21 |
+| Llama 3B | 3B | 128K | 6.75 |
+| Llama 8B | 8B | 128K | 12.57 |
+| Mistral 7B | 7B | 32K | 11.12 |
+| Qwen 14B | 14B | 152K | 20.50 |
+
+
 ---
 
 ## Llama 3.2-3B P1 session 10 (resuming from step 1150)
