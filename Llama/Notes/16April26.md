@@ -10,7 +10,7 @@ Resuming from `checkpoint-250`.
 | Step | Train | Val | Session |
 |------|-------|-----|---------|
 | 200 | 195.78 | 12.57 | 3 |
-| 250+ | | | *resuming today, session 4* |
+| 250+ | | | *gaslight t4 struck, so only got 287 steps ffs* |
 
 ---
 
