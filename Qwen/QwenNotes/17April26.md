@@ -19,13 +19,13 @@ Resuming from `sentry_step_1460.pt` with `STEP_OFFSET=1460`.
 | 1350 | 190.37 | 16.34 | 18 |
 | 1400 | 197.10 | 16.23 | 19 |
 | 1450 | 186.83 | 16.25 | 19 |
-| 1460+ | | | *session 20. two decades deep.* |
+| 1500 | 195.01 | 16.14 | 20, omg half way point |
 
 ---
 
 ## Notes
 
-twenty sessions, four months. for context: a typical undergraduate module at UCL, TUD or UCC is 12 weeks long, so Qwen has been in training for more than one semester. 
+twenty sessions, for context: a typical undergraduate module at UCL, TUD or UCC is 12 weeks long, so Qwen has been in training for more than one semester. 
 
 ---
 
