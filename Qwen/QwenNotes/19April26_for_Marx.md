@@ -19,7 +19,7 @@ Resuming from `sentry_step_1540.pt` with `STEP_OFFSET=1540`.
 | 1400 | 197.10 | 16.23 | 19 | |
 | 1450 | 186.83 | 16.25 | 19 | |
 | 1500 | 195.01 | 16.14 | 20 | val broke 16.2 |
-| 1540+ | | | 21 | *session of the working model* |
+| 1550 | 192.06 | 16.05 | 21 | broke 16.1 |
 
 The train loss is the superstructure, so the apparent, surface measure. 
 
