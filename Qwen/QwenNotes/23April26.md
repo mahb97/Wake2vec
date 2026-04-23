@@ -15,7 +15,7 @@ Resuming from `sentry_step_1600.pt` with `STEP_OFFSET=1600`.
 | 1500 | 195.01 | 16.14 | 20 |
 | 1550 | 192.06 | 16.05 | 21 |
 | 1600 | 182.28 | 16.11 | 21 |
-| 1600+ | | | *session 22. the Qween returns from fallow.* |
+| 1650 | 189.35 | 16.01 | 22 |
 
 ---
 
