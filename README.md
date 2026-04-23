@@ -430,24 +430,34 @@ For long-running training on preemptible compute, a heartbeat monitoring noteboo
 
 ---
 
-## Current Status (March 2026)
+## Current Status (April 2026)
 
-**Implemented and tested:**
-- TinyLlama P1 + P2: Complete pipeline through LoRA behavioural tuning
-- Llama 3.2-1B P1: Complete embedding-only fine-tune with full checkpoint + sentry infrastructure
-- Llama 3.2-1B P2: LoRA fine-tune in progress (step 200/3000), resume mechanism deployed
-- Qwen 2.5-14B P1: WakeOverlay architecture running (step ~161/3000), DriveSentry FUSE fix deployed
+**Complete pipelines:**
+- **TinyLlama 1.1B:** P1 + P2 + P3 + P3b. Best checkpoint: P3 step 400 (val 3.4188). Full generation outputs in `outputs/p3b_generation_outputs.md`.
+- **Llama 3.2-1B:** P1 + P2 + P3. Confirms TinyLlama null across architectures. Best checkpoint: P2 step 500 (val 4.04).
 
-**Ready but not started:**
-- TinyLlama P3 + Llama P3: Morpheme-compositional alignment scripts written
-- Llama 3.2-3B P1: Script updated
-- Llama 3.1-8B P1: Script updated
+**In progress (P1):**
+- **Llama 3.2-3B:** step 1600/3000, val 6.93 (plateau). SEQ_LEN 512, gradient masking.
+- **Llama 3.1-8B:** step 400/3000, val 11.72. **First model with compositional init + 1.0x radius.** Fastest early descent in lineup. SEQ_LEN 256.
+- **Mistral 7B v0.3:** step 750/3000, val ~11.0 (circling). Sliding window attention, 32K vocab.
+- **Qwen 2.5-14B:** step 1600/3000, val 16.11. Session 22 — longest-running model in the project. WakeOverlay + Adafactor.
+
+**Scripts ready, not started:**
+- **Phi-3 Mini 3.8B:** textbook-quality training data comparison.
+- **Gemma 2 9B:** Google architecture, 256K vocab — minimal Wake injection expected.
+- **Gemma 3n E2B & E4B:** efficient-architecture variants (PLE + MatFormer).
+
+**Key findings established:**
+- **Cross-architecture null:** L_morph never moves during P3, L_device random walks at any lambda. P2's LoRA implicitly learns morpheme composition through language modelling alone. Device triplet contrastive loss is structurally unlearnable as embeddings encode meaning rather than not word-formation process.
+- **Smaller model paradox:** TinyLlama's 32K vocab produces more authentically Joycean output than Llama 3.2-1B's 128K vocab, which gives it the creative advantage.
 
 **Infrastructure:**
 - Triton shim for bnb/triton 3.x compatibility
 - DriveSentry local-first write pattern for FUSE reliability
 - STEP_OFFSET pattern for session-safe callback file naming
 - Resume support: Trainer-native (P2) and manual with STEP_OFFSET (P1)
+- **Compositional embedding initialisation** (from morpheme decomposition data) deployed on 8B, retrofit-ready for Phi/Gemma
+- **1.0x spherical radius** (instead of 1.5x) to eliminates Wake/base norm gap seen in TinyLlama and Llama 1B (Cohen's d = -7.81)
 
 ---
 
@@ -678,9 +688,25 @@ unchanged attention patterns.
 
 ## Citation and Credit
 
-- **Text**: James Joyce, *Finnegans Wake*
-- **Base model**: [TinyLlama-1.1B-Chat](https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0)
-- Conceptual inspiration from work on embedding surgery, retrofitting, and lightweight adapter methods
+- **Text**: James Joyce, *Finnegans Wake* (1939)
+
+**Base models:**
+- [TinyLlama-1.1B-Chat](https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0)
+- [Llama 3.2-1B](https://huggingface.co/meta-llama/Llama-3.2-1B)
+- [Llama 3.2-3B](https://huggingface.co/meta-llama/Llama-3.2-3B)
+- [Llama 3.1-8B](https://huggingface.co/meta-llama/Llama-3.1-8B)
+- [Mistral-7B-v0.3](https://huggingface.co/mistralai/Mistral-7B-v0.3)
+- [Qwen2.5-14B](https://huggingface.co/Qwen/Qwen2.5-14B)
+- [Phi-3-mini-4k-instruct](https://huggingface.co/microsoft/Phi-3-mini-4k-instruct)
+- [Gemma 2 9B](https://huggingface.co/google/gemma-2-9b)
+- [Gemma 3n E2B](https://huggingface.co/google/gemma-3n-E2B)
+- [Gemma 3n E4B](https://huggingface.co/google/gemma-3n-E4B)
+
+**Conceptual inspiration:**
+- Embedding surgery, retrofitting, and lightweight adapter methods (LoRA, PEFT)
+- Biehle, M. (2025). *Comparative Suspension: Joyce's Dubliners and the Computational Invisibility of Figuration*. MA dissertation, UCL. [Comparative Suspension Theory provides the theoretical framework for interpreting null results in Wake embedding geometry.]
+- Zhang, C. (2025). *Attention Is Not What You Need: Grassmann Flows as an Attention-Free Alternative for Sequence Modeling*. [arXiv:2512.19428](https://arxiv.org/abs/2512.19428). [Experimental Grassmann mixing framework in `grassmann_vs_attention.py`.]
+- Acheli, M., et al. (2026). *Motivation is Something You Need*. [arXiv:2602.21064](https://arxiv.org/abs/2602.21064). [Dual-model training paradigm informs multi-phase pipeline design.]
 
 **Cite**: https://github.com/mahb97/Wake2vec/blob/21469d75c26d40988ec5af8a4358d1796a36fdf0/data/CITATION.cff
 
