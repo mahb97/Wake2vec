@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-Fine-tune LLMs on *Finnegans Wake* by injecting ~44K Joyce-specific tokens into the embedding layer and training in phases: embedding-only warm-up (P1), LoRA behavioural adaptation (P2), and optional morpheme-compositional alignment (P3). Three embedding strategies are in play: gradient masking (TinyLlama, Llama), WakeOverlay (Qwen), and frozen-embed LoRA (P2 across all models). Currently running across TinyLlama 1.1B, Llama 3.2-1B, Qwen 2.5-14B, with Llama 3.2-3B and Llama 3.1-8B scripts ready. All training on free Colab T4 GPUs. This is very much a work in progress.
+A comparative embedding injection study fine-tuning ten LLMs on *Finnegans Wake* by injecting ~44K Joyce-specific tokens into the embedding layer and training in phases: embedding-only warm-up (P1), LoRA behavioural adaptation (P2), and morpheme-compositional alignment (P3). Three embedding strategies are utilised: gradient masking (TinyLlama, Llama, Mistral), WakeOverlay (Qwen), and frozen-embed LoRA (P2). Scale ranges from 1.1B (TinyLlama) to 14B (Qwen), across three architecture families (Llama/Qwen/Mistral, Phi, Gemma) and four vocab sizes (32K to 256K). Two pipelines have been completed: TinyLlama and Llama 3.2-1B, both confirming a cross-architecture null result: P2's LoRA implicitly learns morpheme composition through language modelling alone, and triplet contrastive loss for word-formation devices is structurally unlearnable. Key finding: the **smaller model paradox** TinyLlama's 32K vocab produces more authentically Joycean output than Llama 3.2-1B's 128K vocab, despite equivalent scale, whereby the constraint becomes the creative advantage. All training on free Colab T4 GPUs across four Google accounts. Very much a work in progress.
 
 [For when that T4 hits (connecting...)](https://soundcloud.com/houseof_kyri/sets/for-when-that-t4-hits?si=14377a8a628e46cda5971241e0547f5a&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing)
 
@@ -13,14 +13,15 @@ Fine-tune LLMs on *Finnegans Wake* by injecting ~44K Joyce-specific tokens into 
 | Model | Params | Phase | Status | Notes |
 |---|---|---|---|---|
 | TinyLlama 1.1B | 1.1B | **P1→P2→P3→P3b complete** | Done | P1: loss 8.46 → 0.079. P2: best val 0.6393. P3/P3b: geometric losses null — L_morph solved by P2, L_device structural null. Best ckpt: P3 step 400 (val 3.4188) |
-| Llama 3.2-1B | 1B |  **P1→P2→P3→P3b complete** | Done | P3: L_morph=0.0007 (3.5x TinyLlama) but never moved. L_device flat. Same null, different baseline. |
-| Llama 3.2-3B | 3B | P1 running | Step 900/3000 | Gradient masking, AdamW, SEQ_LEN 512. Val 6.77, plateauing ~6.7 |
-| Llama 3.1-8B | 8B | P1 running | 100/3000 | Biggest Llama that fits on free T4. |
-| Mistral 7B v0.3 | 7B | P1 at 300/3000 | Session 1 | Sliding window attention, 32K vocab (+44,553 Wake tokens), SEQ_LEN 256 |
-| Qwen 2.5-14B | 14B | P1 running | Step 1220/3000 | WakeOverlay arch, Adafactor, SEQ_LEN 128. Val 16.95, still dropping |
-| Phi-3 Mini | 3.8B | P1 script pending | Not started | "Textbook quality" training data. Next on account 3 |
-| Gemma 2 9B | 9B | P1 script pending | Not started | Google architecture. Next on account 4 |
-
+| Llama 3.2-1B | 1B | **P1→P2→P3 complete** | Done | P3: L_morph=0.0007 (3.5x TinyLlama) but never moved. L_device flat. Same null, different baseline. |
+| Llama 3.2-3B | 3B | P1 running | Step 1600/3000 | Gradient masking, AdamW, SEQ_LEN 512. Val 6.93, plateaued ~6.8-6.9. Memorising hard. |
+| Llama 3.1-8B | 8B | P1 running | Step 400/3000 | **Compositional init + 1.0x radius.** Val dropped 12.57 → 11.72 in 200 steps. Best early descent in lineup. |
+| Mistral 7B v0.3 | 7B | P1 running | Step 750/3000 | Sliding window attention, 32K vocab (+44,553 Wake tokens), SEQ_LEN 256. Val circling 11.0. |
+| Qwen 2.5-14B | 14B | P1 running | Step 1600/3000 | WakeOverlay arch, Adafactor, SEQ_LEN 128. Val 16.11, past halfway. 22 sessions deep. |
+| Phi-3 Mini | 3.8B | P1 script pending | Not started | "Textbook quality" training data — does clean training resist Wake chaos? |
+| Gemma 2 9B | 9B | P1 script pending | Not started | Google architecture, 256K vocab — minimal Wake injection expected. |
+| Gemma 3n E2B | ~5B (2B effective) | P1 script pending | Not started | Efficient architecture: PLE + MatFormer. Tests whether Wake injection depends on always-active weights. |
+| Gemma 3n E4B | ~8B (4B effective) | P1 script pending | Not started | Larger efficient variant. Same architecture class as E2B for within-family comparison. |
 
 ---
 
@@ -72,14 +73,20 @@ This places new tokens at a consistent distance from the origin, near the surfac
 
 ## Wake Lexicon
 
-`wake_lexicon.txt` contains 44,989 unique tokens extracted from Finnegans Wake: neologisms, multilingual mashups, accented forms, and Joyce-specific compounds. These get added to whatever base tokenizer we're using. For models with larger vocabs (Llama 3.x has 128K, Qwen 2.5 has 152K vs TinyLlama's 32K), some Wake tokens already exist in the base vocab and don't need to be added.
+`wake_lexicon.txt` contains 44,989 unique tokens extracted from Finnegans Wake: neologisms, multilingual constructions, accented forms, and Joyce-specific compounds. These get added to whatever base tokenizer we're using. Vocab size matters: smaller tokenizers (32K for TinyLlama, Mistral, Phi-3) require near-full injection of ~44K new tokens, while larger tokenizers (128K for Llama 3.x, 152K, Qwen, 256K, Gemma) already cover many Wake forms natively and need fewer additions. This vocab-size variable turns out to drive one of the project's key findings, see the smaller model paradox below.
 
 | Model | Base vocab | Wake tokens added | Total vocab |
 |---|---|---|---|
 | TinyLlama 1.1B | 32,000 | ~44,500 | ~76,500 |
+| Mistral 7B v0.3 | 32,768 | 44,553 | 77,321 |
+| Phi-3 Mini 3.8B | 32,064 | TBD (~44,500 est.) | TBD |
 | Llama 3.2-1B | 128,256 | 44,195 | 172,451 |
 | Llama 3.2-3B | 128,256 | 44,195 | 172,451 |
+| Llama 3.1-8B | 128,256 | 44,195 | 172,451 |
 | Qwen 2.5-14B | 152,064 | 43,824 | 196,888 |
+| Gemma 2 9B | 256,000 | TBD (minimal expected) | TBD |
+| Gemma 3n E2B | 256,000 | TBD (minimal expected) | TBD |
+| Gemma 3n E4B | 256,000 | TBD (minimal expected) | TBD |
 
 ---
 
@@ -251,8 +258,14 @@ Block counts vary by model (different SEQ_LEN):
 |---|---|---|---|
 | TinyLlama 1.1B P1 | 256 | 1,566 | 174 |
 | Llama 3.2-1B P1 | 512 | ~800 | ~90 |
-| Llama 3.2-3B P1 | 256 | 802 | 90 |
+| Llama 3.2-3B P1 | 512 | 802 | 90 |
+| Llama 3.1-8B P1 | 256 | ~1,600 | ~180 |
+| Mistral 7B v0.3 P1 | 256 | ~1,600 | ~180 |
 | Qwen 2.5-14B P1 | 128 | 3,221 | 358 |
+| Phi-3 Mini P1 | TBD | TBD | TBD |
+| Gemma 2 9B P1 | TBD | TBD | TBD |
+| Gemma 3n E2B P1 | TBD | TBD | TBD |
+| Gemma 3n E4B P1 | TBD | TBD | TBD |
 
 ## Embedding Analysis
 
