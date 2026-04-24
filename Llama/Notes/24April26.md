@@ -42,7 +42,9 @@ Resuming from `checkpoint-1600`.
 | 1400 | 42.99 | 6.89 | 12 |
 | 1500 | 44.91 | 6.93 | 12 |
 | 1600 | 44.08 | 6.93 | 13 |
-| 1600+ | | | *resuming today, session 14* |
+| 1700 | 42.54 | 6.96 | 14 |
+
+overfit is the new oversized
 
 ---
 
