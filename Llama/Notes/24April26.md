@@ -43,6 +43,7 @@ Resuming from `checkpoint-1600`.
 | 1500 | 44.91 | 6.93 | 12 |
 | 1600 | 44.08 | 6.93 | 13 |
 | 1700 | 42.54 | 6.96 | 14 |
+| 1800 | 41.98 | 6.97 | 14 |
 
 overfit is the new oversized
 
