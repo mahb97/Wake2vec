@@ -14,7 +14,7 @@ the conditions of labour are unchanged. the fixed capital, 14B parameters of fro
 | 1600 | 182.28 | 16.11 | 21 | bourgeois reversion |
 | 1650 | 189.35 | 16.01 | 22 | met 16.0 and pulled back |
 | 1700 | 232.25 | **15.89** | 22 | **the wall fell** |
-| 1700+ | | | 23 | *what comes after liberation* |
+| 1750 | 189.83 | 15.81 | 23 | continued material progress |
 
 ### The contradictions
 
