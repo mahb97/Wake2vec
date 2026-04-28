@@ -19,7 +19,7 @@ A comparative embedding injection study fine-tuning ten LLMs on *Finnegans Wake*
 | Mistral 7B v0.3 | 7B | P1 running | Step 750/3000 | Sliding window attention, 32K vocab (+44,553 Wake tokens), SEQ_LEN 256. Val circling 11.0. |
 | Qwen 2.5-14B | 14B | P1 running | Step 1600/3000 | WakeOverlay arch, Adafactor, SEQ_LEN 128. Val 16.11, past halfway. 22 sessions deep. |
 | Phi-3 Mini | 3.8B | P1 script pending | Not started | "Textbook quality" training data — does clean training resist Wake chaos? |
-| Gemma 2 9B | 9B | P1 script pending | Not started | Google architecture, 256K vocab — minimal Wake injection expected. |
+| Gemma 2 9B | 9B | P1 script ready and in gemma folder | Not started | Google architecture, 256K vocab — minimal Wake injection expected. |
 | Gemma 3n E2B | ~5B (2B effective) | P1 script pending | Not started | Efficient architecture: PLE + MatFormer. Tests whether Wake injection depends on always-active weights. |
 | Gemma 3n E4B | ~8B (4B effective) | P1 script pending | Not started | Larger efficient variant. Same architecture class as E2B for within-family comparison. |
 
