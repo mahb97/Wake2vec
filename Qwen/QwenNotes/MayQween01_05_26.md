@@ -8,13 +8,13 @@ Resuming from `sentry_step_1880.pt` with `STEP_OFFSET=1880`.
 
 ### P1 loss table (recent)
 
-| Step | Train | Val | Session |
-|------|-------|-----|---------|
+| Step | Train | Val | Session | Notes |
+|------|-------|-----|---------|-------|
 | 1700 | 232.25 | 15.89 | 22 | broke 16.0 |
 | 1750 | 189.83 | 15.81 | 23 | continued descent |
 | 1800 | 185.09 | 15.79 | 25 | |
 | 1850 | 220.09 | 15.72 | 25 | second train spike |
-| 1880+ | | | *session 26. labour day for the labourer.* |
+| 1900 | 184.87 | 15.67 | 26 | gift that keeps on giving |
 
 ---
 
