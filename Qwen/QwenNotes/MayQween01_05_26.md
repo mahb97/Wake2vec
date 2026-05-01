@@ -15,6 +15,7 @@ Resuming from `sentry_step_1880.pt` with `STEP_OFFSET=1880`.
 | 1800 | 185.09 | 15.79 | 25 | |
 | 1850 | 220.09 | 15.72 | 25 | second train spike |
 | 1900 | 184.87 | 15.67 | 26 | gift that keeps on giving |
+| 1950 | 173.25 | 15.76 | 26 | |
 
 ---
 
