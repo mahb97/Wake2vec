@@ -313,7 +313,7 @@ class FullCheckpoint(TrainerCallback):
 
 
 class SentryMirror(TrainerCallback):
-    """mirror trainer checkpoints to Drive."""
+    """Mirror Trainer checkpoints to Drive."""
     def on_save(self, args, state, control, **kw):
         try:
             cks = sorted(
@@ -324,15 +324,22 @@ class SentryMirror(TrainerCallback):
             if not cks:
                 return
             ck = cks[0]
-            if not has_weights(ck):
-                return
+            
             dst = SENTRY / ck.name
             if dst.exists():
-                return
+                if has_weights(dst):
+                   return  # already complete, skip
+                else:
+                    # partial mirror, needs to nuke and recopy
+                    print(f"[SENTRY] {ck.name}: incomplete mirror detected, retrying")
+                    shutil.rmtree(dst)
             shutil.copytree(ck, dst)
-            print(f"[SENTRY] {ck.name}: mirrored")
+            if not has_weights(dst):
+                print(f"[SENTRY] {ck.name}: WARNING — weights missing after copy")
+            else:
+                print(f"[SENTRY] {ck.name}: mirrored ✓")
         except Exception as e:
-            print(f"[SENTRY] {e}")
+            print(f"[SENTRY] Step {state.global_step}: {e}")
 
 
 class LossMonitor(TrainerCallback):
