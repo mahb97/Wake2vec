@@ -555,18 +555,18 @@ num_new_tokens = vocab_size - BASE_VOCAB
 E_base = E_post[:BASE_VOCAB]
 E_new = E_post[BASE_VOCAB:]
 
-# get pre-training embeds for drift analysis
+# pre-training embeddings for drift
 pre_path = RUN_DIR / "embeddings_pre.pt"
 has_pre = pre_path.exists()
 if has_pre:
     E_pre_all = torch.load(pre_path, map_location="cpu").numpy()
     E_pre_base = E_pre_all[:BASE_VOCAB]
     E_pre_new = E_pre_all[BASE_VOCAB:]
-    print(f"[PRE] Loaded pre-training embeddings: {E_pre_all.shape}")
+    print(f"Loaded pre-training embeddings: {E_pre_all.shape}")
 else:
-    print("[PRE] No pre-training snapshot found (skipping drift analysis)")
+    print("No pre-training snapshot, skipping drift analysis")
 
-# norm analysis with stats test
+# 1. Norm analysis
 norms = l2(E_post, axis=1)
 base_norms = norms[:BASE_VOCAB]
 new_norms = norms[BASE_VOCAB:]
@@ -576,18 +576,16 @@ u_stat, u_pval = stats.mannwhitneyu(base_norms, new_norms, alternative='two-side
 pooled_std = np.sqrt((base_norms.std()**2 + new_norms.std()**2) / 2)
 cohens_d = (base_norms.mean() - new_norms.mean()) / pooled_std
 
-print("=" * 60)
-print("1. NORM ANALYSIS")
-print("=" * 60)
-print(f"  Global  -- mean: {norms.mean():.4f}, std: {norms.std():.4f}, "
-      f"min: {norms.min():.4f}, max: {norms.max():.4f}")
-print(f"  Base    -- mean: {base_norms.mean():.4f}, std: {base_norms.std():.4f} (n={BASE_VOCAB})")
-print(f"  New     -- mean: {new_norms.mean():.4f}, std: {new_norms.std():.4f} (n={num_new_tokens})")
-print(f"  Welch t-test:    t={t_stat:.4f}, p={t_pval:.2e}")
-print(f"  Mann-Whitney U:  U={u_stat:.0f}, p={u_pval:.2e}")
-print(f"  Cohen's d:       {cohens_d:.4f}")
+print("\nNorm analysis")
+print(f"  Global   mean {norms.mean():.4f}  std {norms.std():.4f}  "
+      f"min {norms.min():.4f}  max {norms.max():.4f}")
+print(f"  Base     mean {base_norms.mean():.4f}  std {base_norms.std():.4f}  (n={BASE_VOCAB})")
+print(f"  New      mean {new_norms.mean():.4f}  std {new_norms.std():.4f}  (n={num_new_tokens})")
+print(f"  Welch t-test     t={t_stat:.4f}  p={t_pval:.2e}")
+print(f"  Mann-Whitney U   U={u_stat:.0f}  p={u_pval:.2e}")
+print(f"  Cohen's d        {cohens_d:.4f}")
 
-# eigenvalue based isotropy
+# 2. Isotropy (Mu et al. 2018)
 def compute_isotropy(embeddings, label=""):
     centered = embeddings - embeddings.mean(axis=0)
     nrm = l2(centered, axis=1, keepdims=True)
@@ -611,17 +609,13 @@ iso_all, cos_all, n_all = compute_isotropy(E_post)
 iso_base, cos_base, n_base = compute_isotropy(E_base)
 iso_new, cos_new, n_new = compute_isotropy(E_new)
 
-print(f"\n{'=' * 60}")
-print("2. ISOTROPY (Mu et al. 2018 partition function ratio)")
-print("=" * 60)
-print(f"  All tokens  -- isotropy: {iso_all:.6f}, mean_cos: {cos_all:.4f} (n={n_all})")
-print(f"  Base tokens -- isotropy: {iso_base:.6f}, mean_cos: {cos_base:.4f} (n={n_base})")
-print(f"  New tokens  -- isotropy: {iso_new:.6f}, mean_cos: {cos_new:.4f} (n={n_new})")
+print("\nIsotropy (Mu et al. 2018)")
+print(f"  All tokens    {iso_all:.6f}  mean_cos {cos_all:.4f}  (n={n_all})")
+print(f"  Base tokens   {iso_base:.6f}  mean_cos {cos_base:.4f}  (n={n_base})")
+print(f"  New tokens    {iso_new:.6f}  mean_cos {cos_new:.4f}  (n={n_new})")
 
-# embed drift (pre vs post) -
-
+# 3. Embedding drift
 if has_pre:
-    # base token drift
     base_pre_norms = l2(E_pre_base, axis=1, keepdims=True)
     base_post_norms = l2(E_base, axis=1, keepdims=True)
     base_pre_norms = np.where(base_pre_norms < 1e-12, 1e-12, base_pre_norms)
@@ -632,7 +626,6 @@ if has_pre:
     )
     drift_l2 = l2(E_base - E_pre_base, axis=1)
 
-    # wake token drift
     new_pre_norms = l2(E_pre_new, axis=1, keepdims=True)
     new_post_norms = l2(E_new, axis=1, keepdims=True)
     new_pre_norms = np.where(new_pre_norms < 1e-12, 1e-12, new_pre_norms)
@@ -643,37 +636,30 @@ if has_pre:
     )
     wake_drift_l2 = l2(E_new - E_pre_new, axis=1)
 
-    print(f"\n{'=' * 60}")
-    print("3. EMBEDDING DRIFT (pre -> post)")
-    print("=" * 60)
-    print(f"  Base tokens (should be ~1.0 with gradient masking):")
-    print(f"    Cosine sim -- mean: {drift_cos.mean():.6f}, std: {drift_cos.std():.6f}")
-    print(f"    L2 dist    -- mean: {drift_l2.mean():.6f}, std: {drift_l2.std():.6f}")
-    print(f"  Wake tokens:")
-    print(f"    Cosine sim -- mean: {wake_drift_cos.mean():.6f}, std: {wake_drift_cos.std():.6f}")
-    print(f"    L2 dist    -- mean: {wake_drift_l2.mean():.6f}, std: {wake_drift_l2.std():.6f}")
+    print("\nEmbedding drift (pre to post)")
+    print(f"  Base tokens (expect ~1.0 with gradient masking)")
+    print(f"    cosine sim   mean {drift_cos.mean():.6f}  std {drift_cos.std():.6f}")
+    print(f"    L2 dist      mean {drift_l2.mean():.6f}  std {drift_l2.std():.6f}")
+    print(f"  Wake tokens")
+    print(f"    cosine sim   mean {wake_drift_cos.mean():.6f}  std {wake_drift_cos.std():.6f}")
+    print(f"    L2 dist      mean {wake_drift_l2.mean():.6f}  std {wake_drift_l2.std():.6f}")
 
     if drift_cos.mean() > 0.9999:
-        print("  >> Base tokens unchanged (gradient masking working)")
+        print("  base tokens unchanged (gradient masking working)")
     elif drift_cos.mean() > 0.999:
-        print("  >> Minimal base drift (numerical noise)")
+        print("  minimal base drift (numerical noise)")
     else:
-        print("  >> WARNING: Significant base drift detected despite gradient masking")
+        print("  warning: significant base drift despite gradient masking")
 
-    # top 20 most-drifted Wake tokens
     wake_drift_order = np.argsort(wake_drift_cos)
-    print(f"\n  Top 20 most-changed Wake tokens:")
+    print("\n  Top 20 most-changed Wake tokens")
     for rank, idx in enumerate(wake_drift_order[:20]):
         global_idx = BASE_VOCAB + idx
         token_str = tok.convert_ids_to_tokens(int(global_idx))
         print(f"    {rank+1:2d}. [{global_idx:6d}] {token_str!r:25s}  "
-              f"cos={wake_drift_cos[idx]:.6f}  L2={wake_drift_l2[idx]:.4f}")
+              f"cos {wake_drift_cos[idx]:.6f}  L2 {wake_drift_l2[idx]:.4f}")
 
-# nearest neighbour sanity checks
-print(f"\n{'=' * 60}")
-print("4. NEAREST NEIGHBORS (Wake tokens -> base vocab)")
-print("=" * 60)
-
+# 4. Nearest neighbours
 all_norms_safe = l2(E_post, axis=1, keepdims=True)
 all_norms_safe = np.where(all_norms_safe < 1e-12, 1e-12, all_norms_safe)
 E_unit = E_post / all_norms_safe
@@ -687,22 +673,18 @@ if num_new_tokens > 1000:
 
 E_base_unit = E_unit[:BASE_VOCAB]
 
+print("\nNearest neighbours (Wake tokens to base vocab)")
 for wake_id in sample_wake_ids:
     wake_token = tok.convert_ids_to_tokens(wake_id)
     wake_vec = E_unit[wake_id:wake_id+1]
     sims = (wake_vec @ E_base_unit.T).squeeze()
     top5 = np.argsort(sims)[-5:][::-1]
     neighbors = [(tok.convert_ids_to_tokens(int(i)), sims[i]) for i in top5]
-    nb_str = ", ".join(f"{t!r}({s:.3f})" for t, s in neighbors)
-    print(f"  {wake_token!r:25s} -> {nb_str}")
+    nb_str = ", ".join(f"{t!r} ({s:.3f})" for t, s in neighbors)
+    print(f"  {wake_token!r:25s}  →  {nb_str}")
 
-# intrinsic dimensionality (pca)
-print(f"\n{'=' * 60}")
-print("5. INTRINSIC DIMENSIONALITY (PCA explained variance)")
-print("=" * 60)
-
+# 5. Intrinsic dimensionality (PCA)
 n_components = min(100, dim, BASE_VOCAB, num_new_tokens)
-
 pca_base = PCA(n_components=n_components).fit(E_base)
 pca_new = PCA(n_components=n_components).fit(E_new)
 
@@ -714,19 +696,16 @@ dim90_new = np.searchsorted(cumvar_new, 0.90) + 1
 dim95_base = np.searchsorted(cumvar_base, 0.95) + 1
 dim95_new = np.searchsorted(cumvar_new, 0.95) + 1
 
-print(f"  Base tokens -- 90% variance in {dim90_base} PCs, 95% in {dim95_base} PCs")
-print(f"  New tokens  -- 90% variance in {dim90_new} PCs, 95% in {dim95_new} PCs")
-print(f"  Top-1 PC explains: base={pca_base.explained_variance_ratio_[0]:.4f}, "
-      f"new={pca_new.explained_variance_ratio_[0]:.4f}")
+print("\nIntrinsic dimensionality (PCA)")
+print(f"  Base tokens   90% in {dim90_base} PCs   95% in {dim95_base} PCs")
+print(f"  New tokens    90% in {dim90_new} PCs   95% in {dim95_new} PCs")
+print(f"  Top-1 PC      base {pca_base.explained_variance_ratio_[0]:.4f}   "
+      f"new {pca_new.explained_variance_ratio_[0]:.4f}")
 
 if dim90_new < dim90_base * 0.5:
-    print("  >> WARNING: New tokens in low-dimensional subspace (potential collapse)")
+    print("  warning: new tokens in low-dimensional subspace (potential collapse)")
 
-# pairwise cosine similarity distributions
-print(f"\n{'=' * 60}")
-print("6. PAIRWISE COSINE SIMILARITY DISTRIBUTIONS")
-print("=" * 60)
-
+# 6. Pairwise cosine similarity
 rng = np.random.default_rng(42)
 n_sample = 2000
 
@@ -747,12 +726,13 @@ cos_bb = sample_pairwise_cosines(E_base, E_base, n_sample)
 cos_nn = sample_pairwise_cosines(E_new, E_new, n_sample)
 cos_bn = sample_pairwise_cosines(E_base, E_new, n_sample)
 
-print(f"  (base,base) -- mean: {cos_bb.mean():.4f}, std: {cos_bb.std():.4f}")
-print(f"  (new,new)   -- mean: {cos_nn.mean():.4f}, std: {cos_nn.std():.4f}")
-print(f"  (base,new)  -- mean: {cos_bn.mean():.4f}, std: {cos_bn.std():.4f}")
-
 ks_stat, ks_pval = stats.ks_2samp(cos_bb, cos_nn)
-print(f"  KS test (base-base vs new-new): D={ks_stat:.4f}, p={ks_pval:.2e}")
+
+print("\nPairwise cosine similarity")
+print(f"  (base, base)   mean {cos_bb.mean():.4f}   std {cos_bb.std():.4f}")
+print(f"  (new, new)     mean {cos_nn.mean():.4f}   std {cos_nn.std():.4f}")
+print(f"  (base, new)    mean {cos_bn.mean():.4f}   std {cos_bn.std():.4f}")
+print(f"  KS test        D={ks_stat:.4f}   p={ks_pval:.2e}")
 
 # plots
 fig, axes = plt.subplots(2, 3, figsize=(18, 10))
@@ -949,4 +929,16 @@ def temperature_sweep(prompt, temps=[0.5, 0.7, 0.9, 1.0, 1.2], **kwargs):
 
 # test
 generate_wake("riverrun, past Eve and Adam's,")
+
+# temperature_sweep("riverrun, past Eve and Adam's,",
+#                 temps=[0.5, 0.7, 0.9, 1.0, 1.2])
+
+# generate_wake("riverrun, past Eve and Adam's,",
+#              num_return_sequences=3,
+#              temperature=0.9)
+
+# generate_wake("riverrun, past Eve and Adam's,",
+#              num_return_sequences=3,
+#              temperature=1.1,
+#              max_new_tokens=512)
 
