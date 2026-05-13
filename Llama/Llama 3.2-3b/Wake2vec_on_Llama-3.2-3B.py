@@ -548,7 +548,7 @@ from numpy.linalg import norm as l2
 from scipy import stats
 from sklearn.decomposition import PCA
 
-E_post = final_emb.numpy()
+E_post = final_emb.to(torch.float32).numpy()
 vocab_size, dim = E_post.shape
 num_new_tokens = vocab_size - BASE_VOCAB
 
@@ -559,7 +559,7 @@ E_new = E_post[BASE_VOCAB:]
 pre_path = RUN_DIR / "embeddings_pre.pt"
 has_pre = pre_path.exists()
 if has_pre:
-    E_pre_all = torch.load(pre_path, map_location="cpu").numpy()
+    E_pre_all = torch.load(pre_path, map_location="cpu").to(torch.float32).numpy()
     E_pre_base = E_pre_all[:BASE_VOCAB]
     E_pre_new = E_pre_all[BASE_VOCAB:]
     print(f"Loaded pre-training embeddings: {E_pre_all.shape}")
