@@ -168,6 +168,7 @@ At P3b's lambdas, L_device contributed 12% of total loss (up from 0.3% in P3). T
 ## Implication:
 
 *The computational "invisibility" of Wake's figuration may be because the structure is implicit in the language patterns themselves, not requiring explicit annotation to emerge in embedding space.*
+
 ---
 
 ## Qwen WakeOverlay Architecture
