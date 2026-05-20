@@ -13,14 +13,14 @@ A comparative embedding injection study fine-tuning ten LLMs on *Finnegans Wake*
 | Model | Params | Phase | Status | Notes |
 |---|---|---|---|---|
 | TinyLlama 1.1B | 1.1B | **complete** | Done | P1: loss 8.46 to 0.079. P2: best val 0.6393. P3/P3b: geometric losses null, L_morph solved by P2, L_device structural null. Best ckpt: P3 step 400 (val 3.4188) |
-| Llama 3.2-1B | 1B | **complete** | Done | P3: L_morph=0.0007 (3.5x TinyLlama) but never moved. L_device flat. Same null, different baseline. |
-| Llama 3.2-3B | 3B | **P1 complete** | Ready for P2 | Gradient masking, AdamW, SEQ_LEN 512. U-curve trajectory: best val 6.68 at step 300, climbed to 7.09 by step 3000. Generations weakest in lineup (smaller model paradox confirmed). P2 launches next |
-| Llama 3.1-8B | 8B | P1 running | Step 1400/3000 | **Compositional init + 1.0x radius.** Val 11.43, mostly descending. Best early descent in lineup |
-| Mistral 7B v0.3 | 7B | P1 running | Step 1500/3000 | Sliding window attention, 32K vocab (+44,553 Wake tokens), SEQ_LEN 256. Broke 11.0 (val 10.92 at step 1200), drifted back up to 11.22 |
-| Qwen 2.5-14B | 14B | P1 running | Step 2250/3000 | WakeOverlay arch, Adafactor, SEQ_LEN 128. Val 15.45, broke 16.0 at step 1700. 31 sessions deep |
-| Phi-3 Mini | 3.8B | P1 script pending | Not started | "Textbook quality" training data |
-| Gemma 2 9B | 9B | P1 script ready (in Gemma folder) | Not started | Google architecture, 256K vocab |
-| Gemma 3n E2B | ~5B (2B effective) | P1 script pending | Not started | Efficient architecture: PLE + MatFormer. Tests whether Wake injection depends on always-active weights |
+| Llama 3.2-1B | 1B | **complete** | Done | P3: L_morph=0.0007 (3.5x TinyLlama) but never moved. L_device flat. Same null, different baseline |
+| Llama 3.2-3B | 3B | **P2 running** | Step 200/3000 | LoRA r=8, 10.78M trainable, loaded from P1 step 300 (best val 6.68). P2 step 100 val 5.33 (1.35 drop from P1), step 200 plateaued at 5.33. Confirms LoRA recovers some routing capacity but inherits the smaller model paradox structurally |
+| Llama 3.1-8B | 8B | P1 running | Step 1600/3000 | Compositional init at 1.0x radius (project's only model with this strategy). Val 11.41, train new low 114.42 |
+| Mistral 7B v0.3 | 7B | P1 running | Step 1750/3000 | Sliding window attention, 32K vocab (44,553 Wake tokens), SEQ_LEN 256. Broke 11.0 at step 1150 (val 10.92), val zigzag in 11.0 to 11.4 band since. Critical test of refined smaller model paradox: 58% Wake vocab share (matches TinyLlama) |
+| Qwen 2.5-14B | 14B | P1 running | Step 2500/3000 | WakeOverlay arch, Adafactor, SEQ_LEN 128. Val 15.18 at step 2500, biggest single-step drop of the run. The only model to never plateau in P1 and it implements warm-restart schedule (Loshchilov and Hutter 2017, SGDR) via STEP_OFFSET manual resume pattern. Train spikes at session restart followed by val descent across 5 documented cycles. Extender run planned post step 3000 |
+| Phi-3 Mini | 3.8B | P1 script pending | Not started | Microsoft textbook-quality training data. 32K vocab, ~58% Wake share. Cross-confirmation candidate for refined paradox |
+| Gemma 2 9B | 9B | P1 script ready | Not started | Google architecture, 256K vocab. Lowest expected Wake share (~17%). Test of paradox at the high-vocab extreme |
+| Gemma 3n E2B | ~5B (2B effective) | P1 script pending | Not started | Efficient architecture: PLE and MatFormer. Tests whether Wake injection depends on always-active weights |
 | Gemma 3n E4B | ~8B (4B effective) | P1 script pending | Not started | Larger efficient variant. Same architecture class as E2B for within-family comparison |
 
 ---
