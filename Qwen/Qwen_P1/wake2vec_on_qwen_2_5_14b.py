@@ -118,12 +118,21 @@ RUN_DIR = Path("/content/drive/MyDrive/wake2vec_qwen14b_p1")
 LOCAL_RUN = Path("/content/runs/wake2vec_qwen14b_p1")
 SENTRY = RUN_DIR / "sentry_backups"
 
+# for extension comment out the above and instead use
+# RUN_DIR = Path("/content/drive/MyDrive/wake2vec_qwen14b_extended")
+# LOCAL_RUN = Path("/content/runs/wake2vec_qwen14b_extended")
+# SENTRY = RUN_DIR / "sentry_backups"
+# CANONICAL_RUN_DIR = Path("/content/drive/MyDrive/wake2vec_qwen14b_p1")  # for reading canonical
+
 for d in [RUN_DIR, LOCAL_RUN, SENTRY]:
     d.mkdir(parents=True, exist_ok=True)
 
 MAX_STEPS = 3000
+# for extension change steps to:
+# MAX_STEPS = 6000 
 LR = 5e-4
 WARMUP_STEPS = max(20, MAX_STEPS // 20)  # 5% warmup
+# for extension could use 0 but SGDR depends on the cosine schedule restarting near peak LR and setting warmup to 0 might disrupt
 WEIGHT_DECAY = 0.0
 BATCH_SIZE = 1
 GRAD_ACCUM = 16              # effective batch 16, same as everyone else
@@ -133,10 +142,13 @@ LOG_STEPS = 20
 EVAL_STEPS = 50
 EMB_SNAP_STEPS = 20
 STEP_OFFSET = 140 # run1(80) + run2(60)
+# for extension change offset to: 
+# STEP_OFFSET = 3000
 
 RESUME_FROM = None
-# (example) 
 # RESUME_FROM = SENTRY / "sentry_step_0080.pt" 
+# for the extension use:
+# RESUME_FROM = CANONICAL_RUN_DIR / "sentry_backups" / "sentry_step_3000.pt"
 
 # VRAM math:
 #   4-bit model body: ~8GB
@@ -342,6 +354,15 @@ wte = model.get_input_embeddings()
 E_pre = wte.wake_embed.weight.detach().cpu().clone()
 torch.save(E_pre, RUN_DIR / "embeddings_pre.pt")
 print(f"  Pre-training snapshot saved: {E_pre.shape}")
+
+# should avoid overwriting the snapshot or killing the runtime, so on extension run, comment out the pre-train snapshot above and use step 3000 insteadnas pre-train snapshot:
+# import shutil
+# canonical_3000_path = CANONICAL_RUN_DIR / "sentry_backups" / "sentry_step_3000.pt"
+# extender_pre_path = RUN_DIR / "embeddings_pre.pt"
+# if canonical_3000_path.exists() and not extender_pre_path.exists():
+    # extract just the embeddings tensor from the canonical sentry payload
+    # ckpt = torch.load(canonical_3000_path, map_location="cpu")
+    # torch.save(ckpt['embeddings'].float(), extender_pre_path)
 
 # callbacks
 # Strategy: save ONLY the trainable embeddings to Drive (~215MB fp16).
