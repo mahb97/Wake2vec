@@ -1,0 +1,112 @@
+{
+  "model": "meta-llama/Llama-3.2-3B",
+  "phase": "P2_LoRA",
+  "p1_source": "/content/drive/MyDrive/wake2vec_llama3b_p1/full_checkpoints/step_0300",
+  "checkpoint": "final",
+  "vocab_size": 172451,
+  "dim": 3072,
+  "base_vocab": 128256,
+  "new_tokens": 44195,
+  "hyperparameters": {
+    "lr": 2e-05,
+    "warmup_ratio": 0.1,
+    "weight_decay": 0.01,
+    "max_steps": 600,
+    "batch_size": 2,
+    "grad_accum": 8,
+    "lora_rank": 8,
+    "lora_alpha": 16,
+    "lora_targets": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "seq_len": 512
+  },
+  "norms": {
+    "global": {
+      "mean": 1.2965062856674194,
+      "std": 0.27300089597702026,
+      "min": 0.639019787311554,
+      "max": 1.7578043937683105
+    },
+    "base": {
+      "mean": 1.1474523544311523,
+      "std": 0.11625728756189346
+    },
+    "new": {
+      "mean": 1.7290676832199097,
+      "std": 0.0031613577157258987
+    },
+    "welch_t": {
+      "t": -1789.7292322370938,
+      "p": 0.0
+    },
+    "mann_whitney_u": {
+      "U": 0.0,
+      "p": 0.0
+    },
+    "cohens_d": -7.072454452514648
+  },
+  "isotropy": {
+    "all": {
+      "score": 0.9460840225219727,
+      "mean_cos": 0.001296904170885682,
+      "n": 5000
+    },
+    "base": {
+      "score": 0.982568621635437,
+      "mean_cos": 0.00010348321666242555,
+      "n": 5000
+    },
+    "new": {
+      "score": 0.9982534050941467,
+      "mean_cos": -2.140088145097252e-05,
+      "n": 5000
+    }
+  },
+  "pairwise_cosine": {
+    "base_base": {
+      "mean": 0.1438705176115036,
+      "std": 0.065529003739357
+    },
+    "new_new": {
+      "mean": 0.00044079203507862985,
+      "std": 0.01865471713244915
+    },
+    "base_new": {
+      "mean": 0.0004046302055940032,
+      "std": 0.01807217113673687
+    },
+    "ks_test_bb_vs_nn": {
+      "D": 0.9434057028514257,
+      "p": 0.0
+    }
+  },
+  "intrinsic_dim": {
+    "base_90pct": 50,
+    "base_95pct": 50,
+    "new_90pct": 50,
+    "new_95pct": 50,
+    "base_top1_var": 0.011890865862369537,
+    "new_top1_var": 0.0005302773788571358,
+    "pca_n_components_capped": 50,
+    "pca_base_subsample": 10000
+  },
+  "loss": {
+    "final_train": 5.23502685546875,
+    "final_eval": 5.332601547241211,
+    "best_eval": 5.332601547241211
+  },
+  "drift": {
+    "base_cosine_mean": 1.0,
+    "base_cosine_std": 7.899974718839076e-08,
+    "base_l2_mean": 0.0,
+    "wake_cosine_mean": 1.0,
+    "wake_cosine_std": 6.088428960993042e-08,
+    "wake_l2_mean": 0.0
+  }
+}
