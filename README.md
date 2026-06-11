@@ -437,39 +437,51 @@ For long-running training on preemptible compute, a heartbeat monitoring noteboo
 
 ---
 
-## Current Status (April 2026)
+## Current Status (June 2026)
 
 **Complete pipelines:**
-- **TinyLlama 1.1B:** P1 + P2 + P3 + P3b. Best checkpoint: P3 step 400 (val 3.4188). Full generation outputs in `outputs/p3b_generation_outputs.md`.
-- **Llama 3.2-1B:** P1 + P2 + P3. Confirms TinyLlama null across architectures. Best checkpoint: P2 step 500 (val 4.04).
+
+- **TinyLlama 1.1B:** P1 + P2 + P3 + P3b. Best checkpoint: P3 step 400 (val 3.4188). Full generation outputs in `outputs/p3b_generation_outputs.md`. The original cross-architecture null finding lives here.
+- **Llama 3.2-1B:** P1 + P2 + P3. Confirms TinyLlama null across configurations. Best checkpoint: P2 step 500 (val 4.04).
+- **Llama 3.2-3B:** P1 + P2 complete. P2 produced the wall at val 5.33 across six consecutive evals (range 0.001046, terminated at step 600). P3 strong running with manual stop pre-registered at step 600 — by step 200, transient-disequilibrium reading confirmed; full pipeline outputs file pending termination.
+- **Qwen 2.5-14B P1 canonical:** Step 3000 landed 9 June 2026. Best val 15.05 @ step 2700, canonical val 15.09 @ step 3000. 39 documented SGDR cycles across 14 weeks. Embedding analysis + generation battery shipped in `outputs/p1_qwen14b_canonical_outputs.md` and `outputs/p1_qwen14b_generation.md`. **The generation result falsified the simple smaller-model paradox**
 
 **In progress (P1):**
-- **Llama 3.2-3B:** step 1600/3000, val 6.93 (plateau). SEQ_LEN 512, gradient masking.
-- **Llama 3.1-8B:** step 400/3000, val 11.72. **First model with compositional init + 1.0x radius.** Fastest early descent in lineup. SEQ_LEN 256.
-- **Mistral 7B v0.3:** step 750/3000, val ~11.0 (circling). Sliding window attention, 32K vocab.
-- **Qwen 2.5-14B:** step 1600/3000, val 16.11. Session 22 — longest-running model in the project. WakeOverlay + Adafactor.
 
-**Scripts ready, not started:**
-- **Phi-3 Mini 3.8B:** textbook-quality training data comparison.
-- **Gemma 2 9B:** Google architecture, 256K vocab — minimal Wake injection expected.
-- **Gemma 3n E2B & E4B:** efficient-architecture variants (PLE + MatFormer).
+- **Llama 3.1-8B:** step 2400/3000, val 11.48 (train just broke 100 for the first time at 93.99). Monotonic upward val drift +0.07 across 800 steps and most extreme train-val divergence in lineup. Compositional init + 1.0x radius (the lineup's only experimental init variation; results so far suggest the experimental variation did not pay off). 600 to P1 end.
+- **Mistral 7B v0.3:** step 2350/3000, val 11.32. Survey-phase wobble inside the 11.28-11.35 band continues; eleven consecutive evals in a 0.07-wide band. Second 11.0 break window 150 steps wide through step 2500 (under empirical test from the 3 June tarot prediction). Critical test of refined smaller-model paradox: 58% Wake-vocab-share (matches TinyLlama).
+- **Llama 3.2-3B P3 strong:** step 200/1000, val 5.49 (+0.16 above P2 wall, recovering). Manual termination at step 600 unless val drops below 5.40.
+
+**Queued to launch:**
+
+- **Phi-3.5 Mini (3.8B):** P1 script ready (`wake2vec_phi35_p1_clean.py`). Launches as soon as 3B P3 terminates at step 600. Microsoft textbook-quality training data comparison; 32K vocab, ~58% Wake share expected (joins TinyLlama+Mistral cohort). Spherical 1.5x init (cohort match). Training data: FW + lexicon + wake_embedding_groups.jsonl. Methodological flag: instruct-tuned (only publicly available variant), acknowledged deviation from the lineup's base-model convention.
+- **Qwen 2.5-14B extender:** launches from `sentry_step_3000.pt` with `STEP_OFFSET=3000`. Tests whether the 39-cycle accidental SGDR mechanism keeps finding descent past the canonical endpoint. Prior on continued descent is very strong given 39 confirmed reproductions in the canonical.
+- **Gemma 2 9B:** P1 script ready. Google architecture, 256K vocab, lowest expected Wake share (~17%). Critical test of paradox at the high-vocab extreme.
+- **Gemma 3n E2B & E4B:** P1 scripts pending. Efficient-architecture variants (PLE + MatFormer).
 
 **Key findings established:**
-- **Cross-architecture null:** L_morph never moves during P3, L_device random walks at any lambda. P2's LoRA implicitly learns morpheme composition through language modelling alone. Device triplet contrastive loss is structurally unlearnable as embeddings encode meaning rather than not word-formation process.
-- **Smaller model paradox:** TinyLlama's 32K vocab produces more authentically Joycean output than Llama 3.2-1B's 128K vocab, which gives it the creative advantage.
+
+- **Refined smaller-model paradox** (falsifying the original simple version): generation quality in the Joycean register is achievable at multiple points in (Wake-vocab-share, model scale, training depth) space. Wake-vocab-share at ~58% (TinyLlama-class) is the **compute-efficient** configuration; scale at 14B with extended training is the **brute-force-efficient** configuration. The minimal-computing argument prefers the compute-efficient path. The original paradox claim was an empirical observation about share alone; the refined claim accounts for the three-axis trade-off the Qwen result revealed.
+- **Cross-architecture geometric null** (confirmed in four configurations): TinyLlama P3, Llama 3.2-1B P3, Llama 3.2-3B P3 strong, Qwen 2.5-14B P1 canonical, they all produce Wake region isotropy at 0.998. P2's LM objective alone implicitly encodes the morpheme-compositional structure P3's auxiliary losses target. Triplet contrastive loss for word-formation devices is structurally unlearnable because Wake tokens distribute on a near-uniform sphere with nowhere preferential for clusters to form.
+- **LoRA ceiling for 128K-vocab Llama at 3B**: val 5.33 confirmed across six consecutive P2 evaluations (range 0.001046). Under strong auxiliary pressure in P3, the model produces brief LM disruption followed by re-equilibration without breaking the wall. The lasting cost of strong λs is the train-val gap widening (0.09 in P2 → 0.74 in P3 strong), a generalisation cost, not LM fit cost.
+- **Accidental SGDR via manual-resume** (39 documented cycles): the STEP_OFFSET-based manual-resume pattern necessitated by free Colab T4 cuts produces a near-perfect reproduction of the Loshchilov-Hutter SGDR schedule. Each of 39 sessions across Qwen's 14-week training produced a measurable train-spike-followed-by-val-descent pattern. Mechanism is robust at scale, not anecdotal.
+- **Bridge tokens identified**: the most-changed Wake tokens after training (`wher`, `leas`, `hing`, `throug`, `befor`, `nig`, `hough`, `bri`, `thos`, `tch`) are truncated common English words, the Wake tokens that bridge between Wake-specific content and base English at sentence boundaries. The model concentrates learning on the English-Wake boundary.
 
 **Infrastructure:**
+
 - Triton shim for bnb/triton 3.x compatibility
 - DriveSentry local-first write pattern for FUSE reliability
-- STEP_OFFSET pattern for session-safe callback file naming
+- STEP_OFFSET pattern for session-safe callback file naming and accidental SGDR mechanism
 - Resume support: Trainer-native (P2) and manual with STEP_OFFSET (P1)
-- **Compositional embedding initialisation** (from morpheme decomposition data) deployed on 8B, retrofit-ready for Phi/Gemma
-- **1.0x spherical radius** (instead of 1.5x) to eliminates Wake/base norm gap seen in TinyLlama and Llama 1B (Cohen's d = -7.81)
+- **WakeOverlay sentry-only-Wake-rows storage** (Qwen-specific): saves only the trained Wake-row matrix per sentry (448MB) rather than the full embedding matrix (~2GB). Across 150 saves over 14 weeks: 67GB vs 300GB Drive footprint. Architectural choice that made the 14-week canonical feasible on free Colab + Drive infrastructure.
+- **Devlog tables as canonical training record**: when the Trainer's `trainer_state.json` was lost in the 9 June Colab cut shortly after canonical step 3000, the devlog tables (maintained by hand across all 39 sessions) supplied the complete (step, train, val) history for canonical loss curve reconstruction. The devlog-as-canonical-record practice is itself a methodological contribution for long training runs on free infrastructure.
+- **Spherical 1.5x init** is the cohort default across the 32K-cohort (TinyLlama, Mistral, Phi-3.5) and the 128K-cohort (Llama family). Compositional init at 1.0x was deployed only on Llama 8B as an experimental variation; results so far do not support it as the new default. Phi-3.5 explicitly uses 1.5x to preserve cohort comparability.
 
 ---
 
-## Sample 1: Single generation
+## TinyLlama 1.1B P3b Generation Samples
 
+## Sample 1
 **Prompt**: `riverrun, past Eve and Adam's,`
 **Params**: temp=0.9, top_p=0.92, top_k=50, rep=1.15
 
