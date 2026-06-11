@@ -284,8 +284,63 @@ The 39th SGDR cycle that started at step 2950, visible in the loss curve as a 48
 
 ## Generation samples 
 
-tbc
+### The prediction was wrong and the falsification is the finding
 
+The pre-generation prediction (made on the basis of the embedding-geometry findings above) was:
+
+*"The 22% Wake-vocab-share prediction is that Qwen will fall closer to the Llama family's quality band than to TinyLlama's."*
+
+The actual generation results reject this prediction emphatically. Qwen 2.5-14B canonical produces **dense, sustained, polyglot Wake-style prose** that is qualitatively at least as dense as TinyLlama's P3b outputs, and arguably more so. Hundreds of tokens of continuous compound morphology, onomatopoeic mass, polyglot mixing including Chinese characters embedded mid-stream (美国 = "America"), reduplication ("kirikirikiring"), Wake place names ("duvlin"), and Joyce-signature constructions ("comeallyous", "darkling", "morrowweth", "thritytwo") all surface across the temperature sweep without the model breaking back to standard English mode.
+
+### Sample (temp=0.9, single generation)
+
+Prompt: `"riverrun, past Eve and Adam's,"`
+
+> stillleroxbelledfarkkeyholemainestsprokeduvlingebrorenhanzassognsplapdustamountturfbrowneirestgenikdonnerycrazingchristmastydepassioflowermockcomickirikirikiringpettyfib'srockelosedarklinghandmakeaprioricanarchcustoscrazingcolumnkillalmeaniummatteroffactnesshypsometersgrandestlownesskinkincaraborgroothsdeliveriedgrandesto'kayanarchpppeaseogonochicinglassgayemiddenmewseyfumederry'smaterfamiliaswednesburyboomoosternightmailnattesmaterfamiliashoarsemen阳magreesfistiknotslimpetuckpointefoxtricklesomethuartpeatrickmaterfamiliasthankyoufulrossecullinansrossecullinansghasternsuckabollytalkingtreethrostlesvowelglidelispinglirraplapvoiceyversychurchmanwaifstraysgreyboundinggidgadminuscoline'saneathmistanotwildebeestschloabfallensicknersmagreesbemindingherbagepigsesfeightenedharrierscupahurling
+
+(Full generation samples in `outputs/p1_qwen14b_generation.md`.)
+
+### quick analysis
+
+1. **Compound morphology at scale.** Wake-style portmanteau-masses sustain for hundreds of characters without breaking to standard English. The bridge tokens identified in the drift analysis ("wher", "leas", "hing", "throug", "befor") do NOT appear prominently in the generation. The model stays inside the Wake-anchored semantic field rather than routing through the English boundary tokens.
+
+2. **Polyglot register.** Chinese characters (美国, 创业, 总结), Semitic-influenced tokens (salaames), German-flavoured constructions (schtinkenkot), Wake place names (duvlin = Dublin), and multilingual roots all appear mixed within Wake-style compounds. This is the Wake's actual polyglot signature being produced compositionally, not a parody of it.
+
+3. **Joyce-specific structural signatures.** Reduplication ("kirikirikiring"), onomatopoeic mass ("rrrwwwkkkrrr"), number-as-word constructions ("thritytwo"), Wake-vocabulary anchor tokens ("salaames" recurring as an attractor), Joyce-signature morphemes ("comeallyous", "darkling", "moriarty"). These are not random tokens but specific Wake stylistic markers being produced systematically.
+
+4. **Sustained register across temperature.** temp=0.5 (most coherent), temp=0.7, temp=0.9, temp=1.0, temp=1.2 (most chaotic) all produce sustained Wake-style output. Lower temps are denser and more repetitive; higher temps are more diverse and chaotic. None break back to standard English mode and the Wake register holds.
+
+5. **"salaames" as model-specific attractor.** The token "salaames" recurs across all temperature settings despite `repetition_penalty=1.15`. This suggests the model has anchored on it as a high-probability Wake-context token, possibly because it represents the polyglot Semitic-origin element of the Wake's vocabulary (might be worth a footnote on model-specific Wake-token attractor states).
+
+### smaller-model paradox (revised, again)
+
+The pre-generation paradox claim was:
+
+*Generation quality in the Joycean register correlates more strongly with Wake-vocab-share than with model scale.*
+
+The Qwen result requires this to be refined. The refined claim:
+
+*Generation quality is achievable across multiple points in (Wake-vocab-share, model scale, training depth) space. Wake-vocab-share at ~58% (TinyLlama-class) is the **compute-efficient** configuration: equivalent quality at a fraction of the parameter and training cost. Scale at 14B combined with extended training (39 SGDR cycles, 14 weeks) is the **brute-force-efficient** configuration: equivalent quality through capacity and depth substituting for vocab share. The intermediate regimes (Llama 1B/3B at 26% share, ~3-week training) produce intermediate results.*
+
+The compute-efficient path remains the small-vocab small-model path. The Qwen result demonstrates that the equivalent generation quality CAN be achieved at 14B with extended training, while TinyLlama achieves it at 1.1B with substantially less compute. The argument thus becomes:
+
+*Methodologically appropriate computational humanities scholarship under infrastructural constraint prefers configurations that achieve the target capability with minimum resource expenditure. The Wake2Vec lineup demonstrates that Wake-style generation quality is achievable at multiple points in the configuration space, and that the small-vocab small-model configuration achieves it for an order of magnitude less compute than the alternative.*
+
+### embedding-geometry findings in context
+
+The norm structure, isotropy 0.998, intrinsic dimensionality 51, and pairwise cosine orthogonality findings are not affected by the generation result. The Wake region IS isotropically distributed regardless of generation quality. What the generation result reveals is that **a 14B model can generate dense Wake-style output even when the Wake region is isotropically distributed orthogonal to the base manifold**. The model uses the Wake region efficiently because it has enough capacity to do so. Smaller models with smaller-share Wake regions (Llama 1B/3B at 26%) lack that capacity, which is why they produce intermediate-quality output despite having geometrically similar Wake regions.
+
+The geometric mechanism for the original paradox was: *Wake tokens spread isotropically when share is low because they don't need to integrate with base*. That mechanism is confirmed by the Qwen embedding analysis. What the generation result adds is: *isotropic Wake regions are still generation-effective when the model has sufficient scale and training depth*. The geometric finding and the generation finding are compatible; both are true.
+
+### Implications for the rest of the lineup
+
+The refined paradox makes specific predictions for the remaining models:
+
+- **Phi-3.5 Mini (3.8B, 32K vocab, ~58% share)**: should produce high-quality Wake output via the TinyLlama-class compute-efficient path. Confirmation expected.
+- **Mistral 7B (32K vocab, 58% share)**: same prediction.
+- **Gemma 2 9B (256K vocab, ~17% share, P1-only)**: difficult prediction. 9B scale is much smaller than Qwen 14B. P1-only training is much shallower than Qwen's 14-week run. Both factors push against the brute-force path. The compute-efficient path is also unavailable due to low share. Expected: intermediate or low quality. The Gemma run becomes a critical test for whether the (share, scale, depth) trade-off can be modelled quantitatively.
+
+The Qwen result transforms the lineup from a paradox-confirmation programme to a configuration-space mapping programme. Each remaining model produces evidence about a different point in (share, scale, depth) space. 
 ## Summary
 
 | Finding | Numerical value | Methodological significance |
@@ -300,6 +355,12 @@ tbc
 | SGDR cycles documented | 39 | Mechanism is robust, not anecdotal |
 | Storage per sentry | 448MB (WakeOverlay) | Architectural choice that enabled T4 feasibility |
 | Canonical artifact | `sentry_step_3000.pt` (448MB) | Single-file canonical, framework-agnostic |
+
+The Qwen P1 canonical provides the geometric mechanism for what the original smaller-model paradox described: Wake-vocab-share determines whether the Wake embedding region is forced to integrate with the base manifold or free to spread out into noise neighbourhoods. The 22% share leaves Qwen's Wake region free, producing near-perfect isotropy and statistically meaningless nearest-neighbour structure with the base.
+
+**The generation samples (11 June 2026) falsified the simple paradox** by producing dense polyglot Wake-style output from this isotropically-distributed Wake region. The refined finding is that the geometric structure of the Wake region (determined by share) and the generation quality from that geometric structure (determined additionally by scale and training depth) are separable variables. Wake-style quality is achievable at multiple points in (share, scale, depth) space.
+
+TinyLlama achieves Wake-style quality equivalent to Qwen's at 1.1B parameters and ~3 weeks of training; Qwen requires 14B parameters and 14 weeks across 39 SGDR cycles. The compute-efficient path is the small-vocab small-model path. Methodologically appropriate computational humanities under infrastructural constraint prefers the configuration that achieves the target capability with minimum resource expenditure. The Wake2Vec lineup is now positioned to demonstrate this through cumulative cross-configuration comparison rather than through a single trade-off observation.
 
 ---
 
