@@ -22,7 +22,7 @@
 | Canonical sentry | 448MB (`sentry_step_3000.pt`) |
 | Architecture | WakeOverlay: base frozen, separate Wake-row matrix trained |
 
-![Canonical Loss Curve](p1_qwen14b_loss_curve.png)
+![Canonical Loss Curve](Qwen_p1_loss.png)
 
 The figure shows the full 60-eval trajectory across 14 weeks: train loss zigzags downward from 345 at step 50 to 140 at step 2950 with seven of the most visible SGDR cycle markers as dotted verticals (the actual count is 39 cycles, one per session restart; only the seven most prominent are drawn for visual legibility). Val loss descends smoothly from 21.54 at step 50 to 15.09 at canonical end, with the best val (15.05 at step 2700) and canonical end (15.09 at step 3000) marked as gold and magenta dots respectively.
 
