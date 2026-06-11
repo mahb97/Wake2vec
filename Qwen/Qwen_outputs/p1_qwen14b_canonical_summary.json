@@ -1,0 +1,48 @@
+{
+  "model": "Qwen/Qwen2.5-14B",
+  "phase": "P1_canonical_WakeOverlay",
+  "canonical_step": 3000,
+  "canonical_val_loss": 15.09,
+  "best_val_loss": 15.05,
+  "best_val_step": 2700,
+  "wake_start": 152064,
+  "num_wake": 43824,
+  "sgdr_cycles_documented": 39,
+  "analysis_note": "Base subsampled to 20K for memory; Wake analyzed fully. Full-base norm result preserved from prior run.",
+  "norms": {
+    "base_full_mean": 1.1415,
+    "base_full_std": 0.2958,
+    "base_full_n": 152064,
+    "base_sample_mean": 1.1409028768539429,
+    "base_sample_std": 0.2963712513446808,
+    "wake_mean": 1.8452033996582031,
+    "wake_std": 0.0754205510020256,
+    "wake_cv": 0.04087384045124054,
+    "cohens_d_full": -3.2596
+  },
+  "isotropy": {
+    "base_sample_iso": 0.9632505178451538,
+    "base_sample_mean_cos": 0.0006628203555010259,
+    "wake_iso": 0.9984485507011414,
+    "wake_mean_cos": -2.126027175108902e-05
+  },
+  "drift": {
+    "wake_drift_cos_mean": 0.95464026927948,
+    "wake_drift_cos_std": 0.045693427324295044,
+    "wake_drift_l2_mean": 0.44824057817459106,
+    "wake_drift_l2_std": 0.34423789381980896
+  },
+  "pca": {
+    "base_sample_90pct_dim": 51,
+    "wake_90pct_dim": 51,
+    "base_top1_pc": 0.0061812736093997955,
+    "wake_top1_pc": 0.004211025312542915
+  },
+  "pairwise_cosine": {
+    "bb_mean": 0.004938473459333181,
+    "ww_mean": 0.003015391528606415,
+    "bw_mean": 0.0007127535645850003
+  },
+  "tokenizer_drift_rows": 399,
+  "tokenizer_drift_pct": 0.9
+}
