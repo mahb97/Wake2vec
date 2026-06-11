@@ -693,6 +693,125 @@ unchanged attention patterns.
 
 ---
 
+## Qwen 2.5-14B P1 Canonical, Generation Samples
+
+(Full outputs in `outputs/p1_qwen14b_generation.md`. The Qwen samples produce a visually dense compound-mass at all temperatures, often without word breaks, so excerpts here are trimmed for legibility.)
+
+### Sample 1: Single generation
+
+**Prompt**: `riverrun, past Eve and Adam's,`
+**Params**: temp=0.9, top_p=0.92, top_k=50, rep=1.15
+
+> stillleroxbelledfarkkeyholemainestsprokeduvlingebrorenhanzassognsplapdustamountturfbrowneirestgenikdonnerycrazingchristmastydepassioflowermockcomickirikirikiringpettyfib'srockelosedarklinghandmakeaprioricanarchcustoscrazingcolumnkillalmeaniummatteroffactnesshypsometersgrandestlownesskinkincaraborgroothsdeliveriedgrandesto'kayanarchpppeaseogonochicinglassgayemiddenmewseyfumederry'smaterfamiliaswednesburyboomoosternightmailnattesmaterfamiliashoarsemen阳magreesfistiknotslimpetuckpointefoxtricklesomethuartpeatrickmaterfamiliasthankyoufulrossecullinansrossecullinansghasternsuckabollytalkingtreethrostlesvowelglidelispinglirraplapvoiceyversychurchman ... [continues for ~256 tokens without breaks]
+
+---
+
+### Sample 2: Temperature sweep
+
+**Prompt**: `riverrun, past Eve and Adam's,`
+**Fixed params**: top_p=0.92, top_k=50, rep=1.15
+
+#### temp=0.5
+
+> stilllerhoosematinangeugaulesrussetspapelboypapelboyainsellahoneconscribedurnthritytwowiddarsmirthpealsdolingsduvlinhitchespoingtapopoOLopingrearrived阳langloanchoritedemoralizingterritorialslozengescontrivancemasticgaulescomepullgaulesgauleswooingcisamispalpruyparlourmendoogdoogtoper'starpinacciolfaolfakemolfa Aleatupusgypsinghouhnhymn美国placelikeconstantinealbumchubsiddlecowldzessid'stoomeydemocriticosleprousficsimilarlozengesbetweenlyohibohsittanghankypanksplapficsimilarduvlinfassedtelekinesisonviedmoysighinspirervagrantloavesgulughuruttyyoulkyoulkarseusanlescingderry's ...
+
+#### temp=0.7
+
+> stilllerhoosematinangeugaeilishgnawthingalmeaniumpapelboyourselfsakepapelboyjury'sdolingsduvlin Mapolfatithingpoingt nanrearrivedsquigglingyoulkcomepullwiggychrystanthemlandercolumnkillahone polyglutturalduvlinbottlerplacelikevallsallsinistrousisod'sterritorialshennarosimund's普通shaddaloavescramwellshaldmelarancitronelionses roughdusessmehrkurioscryptogampalpruyostralianyonsidesuckdooghapsnots essential ...
+
+#### temp=0.9
+
+> diddydidcombitschbiguiddhoosematin objectsangeuleprouspoingtpapelboyumprincipiantahonepapelboy。sallybrightdoublefirstwiggysalaamesjoltinggaulesslivenamondtidiesbeyantwiggywexterford'stonedeafshibernska knows idusessplurabelle'scorveeturetwoheadedsecurelysealingdren'sdurnachewingtarpinaccipraisegaddumptydum'lozengessousersdumptydumenvelopedducomans>convenienceschauysrearrivedhibernskacatclubsubsecmehrkuriosjacobsentawnyforbearcoptplaceliketawnystodgeduvlinneverworn阳magreesmaisonry创业hankypankscomepullhelfmoscashoundedclaudduggelduggeldeaubaleauyoulkuckdoog ...
+
+#### temp=1.0
+
+> censefaulterercarniumexistentialitywebbethshufferingpigstickularlypuptisedphaynixthealmostferehousefulduvlinberaddyolfatarrapoullingberaddypurefusion美国prosperousnessrayburnrayburnrayburnplacelikegobydaffyrearrivedrearrivedmistadolingsjotalphesonsublimatewouldpaygaeilishbuoyedpoingtheadwoodbeppy'swellinformed Sarfrore日子corruptiblecomeallyousgenmenputshameyubetholderpotablybetweenlyillustrationingoncontinentrearrivedrearrivedgidgadcryptoconchoidsiphonostomatarearrived ...
+
+#### temp=1.2
+
+> hogofemiliesturbtelekinesisanarchlepertiesnublidlanglobeaushairwireaneathwebbeth-caplozengesdonnery /*hamovsblondyanchoriterhonndashukarkithagainexchequeredelpistarpinaccianchoriteperturbingelpiscryptoconchoidsiphonostomataputshameyuelpisclerydarklingduvlinnightiestarpinacciumclausedauthorwaysmillickmaam'smasticarkmillickmaam'sgauleseatupusrearrivedpigstickularlyseventeenyearoldwaltzersllongsnipehitting总结physiog ...
+
+---
+
+### Sample 3: Multi-sequence generation (×3)
+
+**Prompt**: `riverrun, past Eve and Adam's,`
+**Params**: temp=0.9, top_p=0.92, top_k=50, rep=1.15, num_return_sequences=3
+
+#### [1]
+
+> censepostfaceumprincipianthoosemermenfrigoriquehoodendosesangeu Eastheadwoodsalaameslozengesbucknesstpapelboyahoneahonecomepullumprincipiant美国ohohcowldcramwellsimperfectionlaudszessid'scruciantidies阳zaynithshebicomepullsalaamesknockingshop roughpoingtpalmsweatdemocriticosashpitsscimmianisedwumblindeedpolldurnluttrellsandhurstrumanyoelambhaughtpipettetumtytum weremcadoopapelboydolingsknowmeyesternterritorialscomepullcomepulltaskmaster'scomepullshellaliterunesturbaryexhortingtumtytumputshameyubowandcoatinjectivejovesday ...
+
+#### [2]
+
+> allsalldoulseme-spondeeschilforebiddenyemcrazedledazechimbesschtinkenkotdvershenradientscupslipsforebiddenyordeffusiongenrouslylauralyeblanalambelhomoidpott美国rassiasheadwood turfbrownaliment智能bigrobbissingmaisonrysalaamessalaames。soferimpalpruyejussukkotbaredsixesuphillsracecoursefulracecoursefulseightpigsesolfa moreporkgrapciasyoelambpalpabrows ...
+
+#### [3]
+
+> hogohemelfarkmainestdeliverieddarklingdullcisamicagenikplaintiff'sallsortprovidentialitylillhavesthreftthoroughgoinglellymarrackspussinessdiffusingfinightthreefoilednavigableathiacarohandmakemirrylambduvlinbutteredhitchesoheremahoremarklablejotalphesongayeth'avignuetarpinaccidonnerygavelkindmourneplapbakereen'stwaddlebiguidddonnelly's ...
+
+---
+
+### Sample 4: Extended (×3, temp=1.1, max_new_tokens=512)
+
+**Prompt**: `riverrun, past Eve and Adam's,`
+**Params**: temp=1.1, top_p=0.92, top_k=50, rep=1.15, num_return_sequences=3, max_new_tokens=512
+
+#### [1]
+
+> hogodeliveriedhooseimpersonatinghibernskasummumpapelboyaringarunglispingpursuitinglorkingjoltingboldyluggedpoingtleprouswha'mmuckyregulectbreavinghennalozengespoourdurnvitiousapopocroscopedemoralizing防hankypanksquoiquoiquoiquoiquoiquoiquoiqjude'shisucowlddoogvitiouslescingmirthpealsinjectivestretchingtrisspassvaulsiesexhortingdusessrearrivedrillieshennaourselfsake roughfallener ... [extended polyglot Wake-style continues for 512 tokens]
+
+#### [2 and 3]
+
+(See `outputs/p1_qwen14b_generation.md` for full extended samples.)
+
+---
+
+### Notes
+
+#### Temperature behaviour
+
+The model produces sustained Wake-style output across all temperatures. Unlike TinyLlama's gradual unravelling from temp=0.5 (most readable) to temp=1.2 (maximum invention), Qwen stays inside the Wake-anchored compound-mass register at all temperatures, with the only variation being density vs diversity:
+
+- **0.5** Maximum density. Heaviest repetition of attractor tokens (`headwood`, `loab`, `salaames`). Compound-mass continuous with no breaks. Least diverse vocabulary.
+- **0.7** High density. Reduced repetition. Polyglot tokens start appearing (`美国`, `presbyoperian`, `scotobrit`).
+- **0.9** Onomatopoeic mass begins (`rrrwwwkkkrrr`). Joyce-signature constructions emerge (`comeallyous`, `tarpinacci`). Multilingual mixing increases.
+- **1.0** Most diverse polyglot mixing. Wider Chinese-character inclusion. New compound coinages at every position.
+- **1.2** Most chaotic but still recognizably Wake-style. New invention at every position. Grammatical structure remains loose throughout (consistent across the temperature range, not a feature of high-temp degradation).
+
+#### Recurring features across all samples
+
+**Compound morphology at scale.** Hundreds of tokens of continuous compound-mass without word breaks. Far denser than TinyLlama's output, which shows clear word boundaries and grammatical scaffolding.
+
+**Polyglot register.** Chinese characters (美国 = "America", 创业 = "entrepreneurship", 总结 = "summary", 阳, 趁, 望, 克, 秧, 蕾, 红, 思, 福, 防), Thai (ัน), German-flavoured constructions (schtinkenkot), Semitic anchors (salaames). The polyglot Wake signature is produced compositionally, not as a parody.
+
+**Wake-vocabulary attractors.** Certain tokens recur across all temperatures and runs despite `rep_penalty=1.15`: `salaames`, `duvlin` (Dublin), `tarpinacci`, `schtinkenkot`, `headwood`, `loab`, `pigses`, `materfamilias`, `comeallyous`, `magrees`. These are model-specific attractor states the canonical Qwen reliably samples toward.
+
+**Joyce-signature constructions.** Reduplication (`kirikirikiring`, `natinatinatinati`, `duggelduggel`, `shahrryardhushahrryard`), onomatopoeic mass (`rrrwwwkkkrrr`), number-as-word (`thritytwo`, `seventyseventh`, `twentynine`, `fourscore`), Wake place names (`duvlin`, `wexterford's`, `tallaght's`, `hibernia`), signature Joyce coinages (`comeallyous` from "come all ye", `darkling`, `morrowweth`).
+
+**No bridge-token routing.** The drift-most Wake tokens (`wher`, `leas`, `hing`, `throug`, `befor`) that act as English-Wake boundary tokens do NOT appear prominently in the generation. The model stays inside the Wake-anchored semantic field rather than routing through the English boundary tokens. This is the structural difference from TinyLlama, whose output passes through English-fluent passages between Wake-style bursts.
+
+**Spacing artifacts.** Consistent compound-fusing across all temperatures (much more extreme than TinyLlama's). This is the WakeOverlay P1 limitation: frozen attention layers can't adapt to new tokenization boundaries, and at Qwen's 14B scale the effect compounds into hundreds of tokens of continuous compound-mass.
+
+#### Cross-model comparison
+
+The TinyLlama (1.1B, 58% Wake share, P3b) and Qwen (14B, 22% Wake share, P1 canonical) outputs both produce Wake-style generation but through visibly different mechanisms:
+
+| | TinyLlama 1.1B P3b | Qwen 2.5-14B P1 |
+|---|--------------------|------------------|
+| Wake-vocab-share | 58% | 22% |
+| Training depth | ~3 weeks | 14 weeks, 39 SGDR cycles |
+| Word boundaries | Visible, grammatically scaffolded | Absent; continuous compound-mass |
+| Polyglot register | Latin/medieval European | Chinese/multilingual + Latin/European |
+| Joyce-signature density | Periodic | Continuous |
+| Wake invention | Per-passage portmanteaus | Per-token portmanteaus |
+| Readability | Pastiche-readable | Density-overwhelming |
+| Mechanism | Wake region integrated into English-anchored base manifold | Wake region orthogonal to multilingual base manifold; scale + depth compensate |
+
+The two outputs are evidence for the refined finding (see `outputs/p1_qwen14b_canonical_outputs.md`): generation quality is achievable across multiple points in (Wake-vocab-share, model scale, training depth) space. TinyLlama achieves it via the compute-efficient path. Qwen achieves it via the brute-force-efficient path. Both produce sustained Wake-style output. The minimal-computing argument prefers the TinyLlama-class configuration as the methodologically appropriate choice under infrastructural constraint.
+
+---
+
 ## Citation and Credit
 
 - **Text**: James Joyce, *Finnegans Wake* (1939)
