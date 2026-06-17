@@ -1,0 +1,194 @@
+{
+  "model": "meta-llama/Llama-3.2-3B",
+  "phase": "P3_morpheme_strong_lambdas",
+  "p2_source": "/content/drive/MyDrive/wake2vec_llama3b_p2_lora/full_checkpoints/step_0100",
+  "checkpoint": "final",
+  "vocab_size": 172451,
+  "dim": 3072,
+  "base_vocab": 128256,
+  "new_tokens": 44195,
+  "hyperparameters": {
+    "lr": 2e-05,
+    "warmup_ratio": 0.1,
+    "weight_decay": 0.01,
+    "max_steps": 600,
+    "batch_size": 4,
+    "grad_accum": 4,
+    "lora_rank": 8,
+    "lora_alpha": 16,
+    "lora_targets": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "seq_len": 512,
+    "lambda_morph": 50.0,
+    "lambda_device": 2.0,
+    "device_triplets": 64,
+    "device_margin": 0.2,
+    "lambda_repulsion": 0.05,
+    "lambda_norm": 0.01,
+    "repulsion_threshold": 0.95,
+    "early_stop_patience": 5,
+    "min_group_size": 3
+  },
+  "morpheme_stats": {
+    "source": "wake_embedding_groups.jsonl",
+    "num_groups": 196,
+    "total_pairs": 5924,
+    "wake_tokens_with_morphemes": 1834
+  },
+  "device_stats": {
+    "source": "device_groups.jsonl",
+    "num_groups": 6,
+    "total_words": 2124,
+    "groups": {
+      "nonce": 757,
+      "malapropism": 690,
+      "portmanteau": 465,
+      "foreign": 150,
+      "pun": 61,
+      "faust": 1
+    }
+  },
+  "norms": {
+    "global": {
+      "mean": 1.2965507507324219,
+      "std": 0.27307140827178955,
+      "min": 0.639019787311554,
+      "max": 1.7578449249267578
+    },
+    "base": {
+      "mean": 1.1474523544311523,
+      "std": 0.11625728756189346
+    },
+    "new": {
+      "mean": 1.7292417287826538,
+      "std": 0.0031463794875890017
+    },
+    "welch_t": {
+      "t": -1790.2829205041971,
+      "p": 0.0
+    },
+    "mann_whitney_u": {
+      "U": 0.0,
+      "p": 0.0
+    },
+    "cohens_d": -7.0745954513549805
+  },
+  "isotropy": {
+    "all": {
+      "score": 0.9462150931358337,
+      "mean_cos": 0.0012912364909425378,
+      "n": 5000
+    },
+    "base": {
+      "score": 0.982568621635437,
+      "mean_cos": 0.00010348321666242555,
+      "n": 5000
+    },
+    "new": {
+      "score": 0.9982630610466003,
+      "mean_cos": -2.1307667338987812e-05,
+      "n": 5000
+    }
+  },
+  "pairwise_cosine": {
+    "base_base": {
+      "mean": 0.1438705176115036,
+      "std": 0.065529003739357
+    },
+    "new_new": {
+      "mean": 0.00033621324109844863,
+      "std": 0.01865546964108944
+    },
+    "base_new": {
+      "mean": 0.0005885515711270273,
+      "std": 0.01807548478245735
+    },
+    "ks_test_bb_vs_nn": {
+      "D": 0.9435677838919461,
+      "p": 0.0
+    }
+  },
+  "intrinsic_dim": {
+    "base_90pct": 101,
+    "base_95pct": 101,
+    "new_90pct": 101,
+    "new_95pct": 101,
+    "base_top1_var": 0.012000580318272114,
+    "new_top1_var": 0.0005954081425443292
+  },
+  "morpheme_direction_analysis": {
+    "top_5_consistent": [
+      {
+        "morpheme": "nor-",
+        "mean_cosine": 1.0,
+        "n_pairs": 2
+      },
+      {
+        "morpheme": "eco-",
+        "mean_cosine": 0.9836201667785645,
+        "n_pairs": 2
+      },
+      {
+        "morpheme": "syl-",
+        "mean_cosine": 0.9747692346572876,
+        "n_pairs": 2
+      },
+      {
+        "morpheme": "-fication",
+        "mean_cosine": 0.9476290345191956,
+        "n_pairs": 3
+      },
+      {
+        "morpheme": "-ola",
+        "mean_cosine": 0.9138584136962891,
+        "n_pairs": 2
+      }
+    ],
+    "bottom_5_consistent": [
+      {
+        "morpheme": "be-",
+        "mean_cosine": 0.1754101812839508,
+        "n_pairs": 61
+      },
+      {
+        "morpheme": "-er",
+        "mean_cosine": 0.1485394686460495,
+        "n_pairs": 244
+      },
+      {
+        "morpheme": "-y",
+        "mean_cosine": 0.14719520509243011,
+        "n_pairs": 405
+      },
+      {
+        "morpheme": "-ed",
+        "mean_cosine": 0.12752746045589447,
+        "n_pairs": 419
+      },
+      {
+        "morpheme": "-s",
+        "mean_cosine": 0.10647430270910263,
+        "n_pairs": 1034
+      }
+    ]
+  },
+  "drift": {
+    "base_cosine_mean": 1.0,
+    "base_cosine_std": 7.899974718839076e-08,
+    "base_l2_mean": 0.0,
+    "wake_cosine_mean": 0.9997551441192627,
+    "wake_cosine_std": 0.0003863298043143004,
+    "wake_l2_mean": 0.028803622350096703
+  },
+  "loss": {
+    "final_train": 19.29,
+    "final_eval": 5.4653,
+    "best_eval": 5.44
+  }
+}
