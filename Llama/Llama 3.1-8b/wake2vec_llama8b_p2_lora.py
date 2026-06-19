@@ -1,0 +1,611 @@
+# -*- coding: utf-8 -*-
+"""Wake2Vec Phase 2: LoRA Fine-Tune (Llama-3.1-8B)
+
+# Wake2Vec Phase 2: LoRA Fine-Tune with Frozen P1 Embeddings
+
+**Model:** meta-llama/Llama-3.1-8B (4-bit quantized)
+**Hardware:** Google Colab T4 GPU + CPU offload
+**P1 Source:** wake2vec_llama8b_p1/full_checkpoints/step_1600 (best val, compositional-init embeddings)
+
+## Overview
+
+Phase 2 loads the embedding weights from the Llama 3.1-8B P1 run
+(3000 steps, gradient-masked, compositional init at 1.0x radius, plateaued
+at val 11.48) and freezes them entirely. LoRA adapters are applied to
+attention (q, k, v) and MLP (gate, up, down) projections. The model learns
+to use the Wake-adapted embeddings through attention/MLP adaptation rather
+than further embedding modification.
+
+## step 1600 as the P1 source
+
+The 8B P1 val U-curved: best val was step 1600 (val 11.41), then it drifted
+monotonically up to 11.48 by step 2800 (the compositional-init plateau, a
+documented negative result, see devlog from june 19). 
+
+| Aspect | 3B P2 | 8B P2 (this script) |
+|--------|-------|---------------------|
+| Model | Llama-3.2-3B | Llama-3.1-8B |
+| Batch | 2 x 8 | 1 x 16 (8B is bigger) |
+| SEQ_LEN | 512 | 256 (8B memory; match 8B P1) |
+| max_memory | {0: 13GB} | {0: 12GB, cpu: 30GB} (offload) |
+| FullCheckpoint embeddings.pt | every save | **once only** (frozen, ~1.4GB each — Drive quota) |
+| TrainerStateMirror | no | **yes** (Qwen P1 lost trainer_state.json) |
+| EVAL_STEPS | 200 | 100 (finer wall-detection) |
+
+## Colab 2026.06 compatibility
+- Triton shim for bnb / triton 3.x
+- SentryMirror fix with has_weights(dst) verification
+
+## envi
+"""
+import os, sys, types
+os.environ["TRANSFORMERS_NO_TORCHAO"] = "1"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
+# triton shim
+fake_perf = types.ModuleType('triton.ops.matmul_perf_model')
+fake_perf.early_config_prune = lambda *a, **k: []
+fake_perf.estimate_matmul_time = lambda *a, **k: 0
+sys.modules['triton.ops'] = types.ModuleType('triton.ops')
+sys.modules['triton.ops.matmul_perf_model'] = fake_perf
+
+import torch, gc
+print(f"torch: {torch.__version__} | cuda: {torch.version.cuda}")
+try:
+    import bitsandbytes as bnb_lib
+    print(f"bitsandbytes: {bnb_lib.__version__}")
+except ImportError:
+    print("no bitsandbytes")
+import transformers, accelerate, peft
+print(f"transformers: {transformers.__version__}")
+print(f"accelerate: {accelerate.__version__}")
+print(f"peft: {peft.__version__}")
+print(f"GPU: {torch.cuda.get_device_name(0)}")
+print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+
+torch.cuda.empty_cache()
+gc.collect()
+
+from google.colab import drive
+drive.mount('/content/drive')
+
+from huggingface_hub import login
+login()
+
+"""## config"""
+
+from pathlib import Path
+
+# P1 source (Llama-3.1-8B, embedding-only, best val @ step 1600)
+P1_SOURCE = Path("/content/drive/MyDrive/wake2vec_llama8b_p1/full_checkpoints/step_1600")
+
+# P2 outputs 
+RUN_DIR = Path("/content/drive/MyDrive/wake2vec_llama8b_p2_lora")
+LOCAL_RUN = Path("/content/runs/wake2vec_llama8b_p2_lora")
+SENTRY = RUN_DIR / "sentry_backups"
+EMB_SNAPS = RUN_DIR / "emb_snaps"
+FULL_CHECKPOINTS = RUN_DIR / "full_checkpoints"
+TRAINER_STATES = RUN_DIR / "trainer_states"
+
+for d in [RUN_DIR, LOCAL_RUN, SENTRY, EMB_SNAPS, FULL_CHECKPOINTS, TRAINER_STATES]:
+    d.mkdir(parents=True, exist_ok=True)
+
+# model
+MODEL_NAME = "meta-llama/Llama-3.1-8B"
+FW_TEXT = "/content/FW_TEXT.txt"
+
+# training hyperparams 
+MAX_STEPS = 3000
+LR = 2e-5
+WARMUP_RATIO = 0.10
+WEIGHT_DECAY = 0.01
+BATCH_SIZE = 1        
+GRAD_ACCUM = 16
+SEQ_LEN = 512           # use 256 if OOM
+SAVE_STEPS = 50         
+LOG_STEPS = 50
+EVAL_STEPS = 100        
+EMB_SNAP_STEPS = 0      
+
+RESUME_FROM = None
+# RESUME_FROM = SENTRY / "checkpoint-200"
+
+# LoRA 
+LORA_RANK = 8
+LORA_ALPHA = 16
+LORA_DROPOUT = 0.1
+LORA_TARGETS = ["q_proj", "k_proj", "v_proj", "gate_proj", "up_proj", "down_proj"]
+
+# base vocab 
+BASE_VOCAB = 128256
+
+print("wake2vec P2 on Llama-3.1-8B with LoRA config")
+print(f"  P1 source: {P1_SOURCE}")
+print(f"  Output: {RUN_DIR}")
+print(f"  Steps: {MAX_STEPS}")
+print(f"  LR: {LR}")
+print(f"  Batch: {BATCH_SIZE} x {GRAD_ACCUM} = {BATCH_SIZE * GRAD_ACCUM}")
+print(f"  SEQ_LEN: {SEQ_LEN}")
+print(f"  Eval every: {EVAL_STEPS} | Save every: {SAVE_STEPS}")
+print(f"  LoRA rank: {LORA_RANK}, targets: {LORA_TARGETS}")
+
+"""## get P1 state"""
+
+from transformers import AutoTokenizer
+
+assert P1_SOURCE.exists(), f"P1 source not found: {P1_SOURCE}"
+assert (P1_SOURCE / "embeddings.pt").exists(), "P1 embeddings.pt not found"
+
+tok = AutoTokenizer.from_pretrained(str(P1_SOURCE), use_fast=True)
+if tok.pad_token is None:
+    tok.pad_token = tok.eos_token
+
+TOTAL_VOCAB = len(tok)
+NUM_WAKE = TOTAL_VOCAB - BASE_VOCAB
+
+print(f"  Vocab size: {TOTAL_VOCAB}")
+print(f"  Base vocab: {BASE_VOCAB}")
+print(f"  Wake tokens: {NUM_WAKE}")
+
+embed_weights = torch.load(P1_SOURCE / "embeddings.pt", map_location="cpu")
+print(f"  Shape: {embed_weights.shape}")
+assert embed_weights.shape[0] == TOTAL_VOCAB, \
+    f"Embedding/vocab mismatch: {embed_weights.shape[0]} vs {TOTAL_VOCAB}"
+
+"""## dataset"""
+
+from torch.utils.data import Dataset
+from sklearn.model_selection import train_test_split
+
+class BlockDataset(Dataset):
+    def __init__(self, blocks, seq_len=256):
+        self.blocks = blocks
+        self.seq_len = seq_len
+    def __len__(self):
+        return len(self.blocks)
+    def __getitem__(self, idx):
+        ids = torch.tensor(self.blocks[idx], dtype=torch.long)
+        return {"input_ids": ids, "labels": ids.clone(), "attention_mask": torch.ones_like(ids)}
+
+if not os.path.exists(FW_TEXT):
+    raise FileNotFoundError(f"FW text not found: {FW_TEXT}")
+with open(FW_TEXT, 'r', encoding='utf-8') as f:
+    text = f.read()
+
+ids = tok(text, add_special_tokens=False)["input_ids"]
+print(f"  Total tokens: {len(ids)}")
+
+blocks = [ids[i:i + SEQ_LEN] for i in range(0, len(ids) - SEQ_LEN + 1, SEQ_LEN)
+          if len(ids[i:i + SEQ_LEN]) == SEQ_LEN]
+print(f"  Total blocks: {len(blocks)}")
+
+train_blocks, val_blocks = train_test_split(blocks, test_size=0.10, random_state=42)
+train_ds = BlockDataset(train_blocks, SEQ_LEN)
+val_ds = BlockDataset(val_blocks, SEQ_LEN)
+print(f"  Train: {len(train_ds)} blocks | Val: {len(val_ds)} blocks")
+
+"""## llama setup"""
+
+from transformers import AutoModelForCausalLM, BitsAndBytesConfig, set_seed
+from peft import LoraConfig, get_peft_model
+
+set_seed(42)
+
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    llm_int8_enable_fp32_cpu_offload=True
+)
+
+model = AutoModelForCausalLM.from_pretrained(
+    MODEL_NAME,
+    quantization_config=bnb_config,
+    dtype=torch.bfloat16,           # `dtype` not `torch_dtype` (transformers 5.x)
+    device_map="auto",
+    max_memory={0: "12GB", "cpu": "30GB"}   # 8B offload budget
+)
+
+model.config.use_cache = False
+model.config.attn_implementation = "eager"
+print(f"  VRAM after load: {torch.cuda.memory_allocated(0) / 1e9:.2f} GB")
+
+# resize to P1 vocab 
+print(f"Resizing embeddings: {BASE_VOCAB} -> {TOTAL_VOCAB}...")
+model.resize_token_embeddings(TOTAL_VOCAB, mean_resizing=False)
+
+# load P1 embeds 
+wte = model.get_input_embeddings()
+with torch.no_grad():
+    wte.weight.copy_(embed_weights.to(wte.weight.device, dtype=wte.weight.dtype))
+
+# tie input/output embeddings
+if hasattr(model, "lm_head"):
+    model.lm_head.weight = wte.weight
+model.config.tie_word_embeddings = True
+if hasattr(model, "tie_weights"):
+    model.tie_weights()
+print("P1 embeddings loaded and tied")
+
+# free the CPU copy 
+del embed_weights
+gc.collect()
+
+# freeze everything
+for p in model.parameters():
+    p.requires_grad = False
+print("All parameters frozen")
+
+# add LoRA 
+peft_config = LoraConfig(
+    r=LORA_RANK, lora_alpha=LORA_ALPHA, lora_dropout=LORA_DROPOUT,
+    target_modules=LORA_TARGETS, bias="none", task_type="CAUSAL_LM"
+)
+model = get_peft_model(model, peft_config)
+model.print_trainable_parameters()
+
+# verify embeds as frozen
+wte = model.get_input_embeddings()
+print(f"Embedding requires_grad: {wte.weight.requires_grad}")
+assert not wte.weight.requires_grad, "Embeddings should be frozen in P2"
+
+"""## save Frozen Embeds"""
+
+E_frozen = model.get_input_embeddings().weight.detach().cpu().clone()
+torch.save(E_frozen, RUN_DIR / "embeddings_frozen.pt")
+# pre-training snapshot for drift 
+torch.save(E_frozen, RUN_DIR / "embeddings_pre.pt")
+print(f"  Saved: {RUN_DIR / 'embeddings_frozen.pt'}  shape {E_frozen.shape}")
+
+"""## callbacks"""
+
+import shutil, time, json
+
+def has_weights(ck):
+    return (ck / "adapter_model.safetensors").exists() or (ck / "pytorch_model.bin").exists()
+
+from transformers import TrainerCallback
+
+class FullCheckpoint(TrainerCallback):
+    def on_save(self, args, state, control, **kwargs):
+        try:
+            step = state.global_step
+            mdl = kwargs.get("model", model)
+            full_ck = FULL_CHECKPOINTS / f"step_{step:04d}"
+            if full_ck.exists():
+                shutil.rmtree(full_ck)
+            full_ck.mkdir(parents=True, exist_ok=True)
+            mdl.save_pretrained(full_ck)       # LoRA adapter only
+            tok.save_pretrained(full_ck)
+            torch.save({'global_step': step, 'best_metric': state.best_metric,
+                        'epoch': state.epoch}, full_ck / "training_state.pt")
+            print(f"[FULL] Step {step}: adapter saved to Drive")
+        except Exception as e:
+            print(f"[FULL] Step {state.global_step}: {e}")
+
+class SentryMirror(TrainerCallback):
+    def on_save(self, args, state, control, **kw):
+        try:
+            cks = sorted(LOCAL_RUN.glob("checkpoint-*"),
+                         key=lambda p: int(p.name.split("-")[-1]), reverse=True)
+            if not cks:
+                return
+            ck = cks[0]
+            if not has_weights(ck):
+                print(f"[SENTRY] {ck.name}: local has no weights yet, skipping")
+                return
+            dst = SENTRY / ck.name
+            if dst.exists():
+                if has_weights(dst):
+                    return
+                print(f"[SENTRY] {ck.name}: incomplete mirror, retrying")
+                shutil.rmtree(dst)
+            shutil.copytree(ck, dst)
+            print(f"[SENTRY] {ck.name}: mirrored ✓" if has_weights(dst)
+                  else f"[SENTRY] {ck.name}: WARNING weights missing after copy")
+        except Exception as e:
+            print(f"[SENTRY] {e}")
+          
+class TrainerStateMirror(TrainerCallback):
+    def on_save(self, args, state, control, **kw):
+        try:
+            cks = sorted(LOCAL_RUN.glob("checkpoint-*"),
+                         key=lambda p: int(p.name.split("-")[-1]), reverse=True)
+            if not cks:
+                return
+            local_ts = cks[0] / "trainer_state.json"
+            if local_ts.exists():
+                shutil.copy(local_ts, TRAINER_STATES / f"trainer_state_step_{state.global_step:04d}.json")
+                shutil.copy(local_ts, TRAINER_STATES / "trainer_state_latest.json")
+        except Exception as e:
+            print(f"[TS] {e}")
+
+class LossMonitor(TrainerCallback):
+    def __init__(self):
+        self.last_train_loss = None
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if logs is None:
+            return
+        if "loss" in logs:
+            self.last_train_loss = logs["loss"]
+        if "eval_loss" in logs and self.last_train_loss is not None:
+            gap = logs["eval_loss"] - self.last_train_loss
+            if gap > 3.0:
+                print(f"[WARN] Large train/eval gap: {gap:.2f}")
+
+class StepTimer(TrainerCallback):
+    def __init__(self):
+        self.step_times = []
+        self.last_time = None
+    def on_step_end(self, args, state, control, **kw):
+        now = time.time()
+        if self.last_time is not None:
+            self.step_times.append(now - self.last_time)
+            if state.global_step % 10 == 0:
+                recent = self.step_times[-10:]
+                avg = sum(recent) / len(recent)
+                remaining = (args.max_steps - state.global_step) * avg / 60
+                print(f"[{state.global_step:4d}] {avg:.1f}s/step | ~{remaining:.0f}min remaining")
+        self.last_time = now
+      
+"""## trainer & train"""
+
+from transformers import TrainingArguments, Trainer
+
+# re-verify LoRA gradients
+for name, param in model.named_parameters():
+    if "lora" in name.lower():
+        param.requires_grad = True
+
+trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+print(f"Trainable parameters: {trainable:,}")
+if trainable == 0:
+    raise RuntimeError("No trainable parameters found")
+
+args = TrainingArguments(
+    output_dir=str(LOCAL_RUN),
+    max_steps=MAX_STEPS,
+    per_device_train_batch_size=BATCH_SIZE,
+    per_device_eval_batch_size=BATCH_SIZE,
+    gradient_accumulation_steps=GRAD_ACCUM,
+    learning_rate=LR,
+    warmup_steps=int(MAX_STEPS * WARMUP_RATIO),
+    lr_scheduler_type="cosine",
+    weight_decay=WEIGHT_DECAY,
+    fp16=False,
+    bf16=True,
+    logging_steps=LOG_STEPS,
+    save_steps=SAVE_STEPS,
+    save_total_limit=10,
+    eval_strategy="steps",
+    eval_steps=EVAL_STEPS,
+    report_to="none",
+    dataloader_pin_memory=False,
+    gradient_checkpointing=True,    
+    max_grad_norm=1.0,
+)
+
+trainer = Trainer(
+    model=model, args=args,
+    train_dataset=train_ds, eval_dataset=val_ds,
+    callbacks=[FullCheckpoint(), SentryMirror(), TrainerStateMirror(),
+               LossMonitor(), StepTimer()],
+)
+
+print(f"  Train: {len(train_ds)} blocks | Val: {len(val_ds)} blocks")
+print(f"  Steps: {MAX_STEPS} | Effective batch: {BATCH_SIZE * GRAD_ACCUM}")
+print(f"  VRAM before training: {torch.cuda.memory_allocated(0) / 1e9:.2f} GB")
+
+t0 = time.time()
+if RESUME_FROM is not None and RESUME_FROM.exists():
+    local_ckpt = LOCAL_RUN / RESUME_FROM.name
+    if not local_ckpt.exists():
+        shutil.copytree(RESUME_FROM, local_ckpt)
+    print(f"[RESUME] {RESUME_FROM.name}")
+    trainer.train(resume_from_checkpoint=str(local_ckpt))
+else:
+    trainer.train()
+elapsed = (time.time() - t0) / 60
+print(f"\nTRAINING COMPLETE ({elapsed:.1f} minutes)")
+
+# save final
+final_dir = RUN_DIR / "final"
+final_dir.mkdir(exist_ok=True)
+model.save_pretrained(str(final_dir))
+tok.save_pretrained(str(final_dir))
+shutil.copy(RUN_DIR / "embeddings_frozen.pt", final_dir / "embeddings.pt")
+print(f"Final LoRA + tokenizer saved to {final_dir}")
+
+"""## loss curve"""
+
+import matplotlib.pyplot as plt
+
+candidates = [TRAINER_STATES / "trainer_state_latest.json"]
+candidates += sorted(TRAINER_STATES.glob("trainer_state_step_*.json"), reverse=True)
+candidates += list(LOCAL_RUN.rglob("trainer_state.json"))
+
+state_to_use = next((c for c in candidates if c.exists()), None)
+if state_to_use is not None:
+    print(f"Using trainer state: {state_to_use}")
+    with open(state_to_use) as f:
+        state = json.load(f)
+    logs = state.get("log_history", [])
+    train_data = [(d["step"], d["loss"]) for d in logs if "loss" in d and "eval_loss" not in d]
+    val_data = [(d["step"], d["eval_loss"]) for d in logs if "eval_loss" in d]
+    if train_data:
+        plt.figure(figsize=(12, 6))
+        steps, losses = zip(*train_data)
+        plt.plot(steps, losses, 'b-o', label='Train', alpha=0.7, markersize=4)
+        if val_data:
+            v_steps, v_losses = zip(*val_data)
+            plt.plot(v_steps, v_losses, 'r-s', label='Val', alpha=0.7, markersize=4)
+        plt.xlabel('Step'); plt.ylabel('Loss')
+        plt.title('Wake2Vec P2: Llama-3.1-8B LoRA Loss Curve')
+        plt.legend(); plt.grid(True, alpha=0.3)
+        plot_path = RUN_DIR / "p2_llama8b_loss_curve.png"
+        plt.savefig(plot_path, dpi=150, bbox_inches="tight")
+        print(f"Plot saved: {plot_path}")
+        plt.show()
+        print(f"\nFinal train loss: {losses[-1]:.4f}")
+        if val_data:
+            print(f"Final val loss: {v_losses[-1]:.4f}")
+            print(f"Best val loss: {min(v_losses):.4f}")
+else:
+    print("No trainer_state.json found, use devlog tables")
+
+"""## embed analysis"""
+
+import numpy as np
+from numpy.linalg import norm as l2
+from scipy import stats
+from sklearn.decomposition import PCA
+
+final_emb = model.get_input_embeddings().weight.detach().cpu()
+E_post = final_emb.float().numpy()
+vocab_size, dim = E_post.shape
+num_new = vocab_size - BASE_VOCAB
+E_base = E_post[:BASE_VOCAB]
+E_new = E_post[BASE_VOCAB:]
+
+pre_path = RUN_DIR / "embeddings_pre.pt"
+has_pre = pre_path.exists()
+if has_pre:
+    E_pre_all = torch.load(pre_path, map_location="cpu").float().numpy()
+    E_pre_base = E_pre_all[:BASE_VOCAB]
+    E_pre_new = E_pre_all[BASE_VOCAB:]
+
+# norms
+norms = l2(E_post, axis=1)
+base_norms = norms[:BASE_VOCAB]
+new_norms = norms[BASE_VOCAB:]
+t_stat, t_pval = stats.ttest_ind(base_norms, new_norms, equal_var=False)
+u_stat, u_pval = stats.mannwhitneyu(base_norms, new_norms, alternative='two-sided')
+pooled_std = np.sqrt((base_norms.std()**2 + new_norms.std()**2) / 2)
+cohens_d = (base_norms.mean() - new_norms.mean()) / pooled_std
+print("=" * 60); print("1. NORM ANALYSIS"); print("=" * 60)
+print(f"  Base -- mean: {base_norms.mean():.4f}, std: {base_norms.std():.4f} (n={BASE_VOCAB})")
+print(f"  New  -- mean: {new_norms.mean():.4f}, std: {new_norms.std():.4f} (n={num_new})")
+print(f"  Welch t: t={t_stat:.4f}, p={t_pval:.2e} | Cohen's d: {cohens_d:.4f}")
+
+# isotropy
+def compute_isotropy(embeddings):
+    centered = embeddings - embeddings.mean(axis=0)
+    nrm = l2(centered, axis=1, keepdims=True); nrm = np.where(nrm < 1e-12, 1e-12, nrm)
+    unit = centered / nrm
+    rng = np.random.default_rng(42)
+    n = min(5000, len(unit))
+    idx = rng.choice(len(unit), size=n, replace=False)
+    sample = unit[idx]
+    cos_mat = sample @ sample.T; np.fill_diagonal(cos_mat, 0)
+    Z = np.exp(cos_mat).sum(axis=1)
+    return float(Z.min() / Z.max()), float(cos_mat.sum() / (n * (n - 1))), n
+iso_all, cos_all, n_all = compute_isotropy(E_post)
+iso_base, cos_base, n_base = compute_isotropy(E_base)
+iso_new, cos_new, n_new = compute_isotropy(E_new)
+print(f"\n2. ISOTROPY")
+print(f"  All  -- {iso_all:.6f} (mean_cos {cos_all:.4f})")
+print(f"  Base -- {iso_base:.6f} (mean_cos {cos_base:.4f})")
+print(f"  New  -- {iso_new:.6f} (mean_cos {cos_new:.4f})")
+
+# drift
+if has_pre:
+    def safe_cos(a, b):
+        na = l2(a, axis=1, keepdims=True); na = np.where(na < 1e-12, 1e-12, na)
+        nb = l2(b, axis=1, keepdims=True); nb = np.where(nb < 1e-12, 1e-12, nb)
+        return np.sum((a / na) * (b / nb), axis=1)
+    wake_drift_cos = safe_cos(E_pre_new, E_new)
+    print(f"\n3. DRIFT (expect ~1.0 — embeddings frozen in P2)")
+    print(f"  Wake cosine: {wake_drift_cos.mean():.6f} +/- {wake_drift_cos.std():.6f}")
+
+# nearest neighbours
+all_norms_safe = l2(E_post, axis=1, keepdims=True); all_norms_safe = np.where(all_norms_safe < 1e-12, 1e-12, all_norms_safe)
+E_unit = E_post / all_norms_safe
+E_base_unit = E_unit[:BASE_VOCAB]
+sample_ids = list(range(BASE_VOCAB, BASE_VOCAB + 10))
+if num_new > 1000:
+    sample_ids += list(range(BASE_VOCAB + num_new // 2, BASE_VOCAB + num_new // 2 + 5))
+for wid in sample_ids:
+    wt = tok.convert_ids_to_tokens(wid)
+    sims = (E_unit[wid:wid+1] @ E_base_unit.T).squeeze()
+    top5 = np.argsort(sims)[-5:][::-1]
+    nb = ", ".join(f"{tok.convert_ids_to_tokens(int(i))!r}({sims[i]:.3f})" for i in top5)
+    print(f"  {wt!r:25s} -> {nb}")
+
+# pca
+n_comp = min(100, dim, num_new)
+pca_base = PCA(n_components=n_comp).fit(E_base)
+pca_new = PCA(n_components=n_comp).fit(E_new)
+cumvar_base = np.cumsum(pca_base.explained_variance_ratio_)
+cumvar_new = np.cumsum(pca_new.explained_variance_ratio_)
+dim90_base = int(np.searchsorted(cumvar_base, 0.90) + 1)
+dim90_new = int(np.searchsorted(cumvar_new, 0.90) + 1)
+print(f"\n5. PCA -- Base 90% in {dim90_base} PCs | New 90% in {dim90_new} PCs")
+
+# pairwise cosine
+rng = np.random.default_rng(42)
+def sample_cos(E1, E2, n=2000):
+    i1 = rng.choice(len(E1), size=min(n, len(E1)), replace=False)
+    i2 = rng.choice(len(E2), size=min(n, len(E2)), replace=False)
+    s1, s2 = E1[i1], E2[i2]
+    n1 = l2(s1, axis=1, keepdims=True); n1 = np.where(n1 < 1e-12, 1e-12, n1)
+    n2 = l2(s2, axis=1, keepdims=True); n2 = np.where(n2 < 1e-12, 1e-12, n2)
+    c = (s1/n1) @ (s2/n2).T
+    return c[np.triu_indices_from(c, k=1)] if E1 is E2 else c.ravel()
+cos_bb = sample_cos(E_base, E_base); cos_nn = sample_cos(E_new, E_new); cos_bn = sample_cos(E_base, E_new)
+print(f"\n6. PAIRWISE COSINE")
+print(f"  (base,base) {cos_bb.mean():.4f} | (new,new) {cos_nn.mean():.4f} | (base,new) {cos_bn.mean():.4f}")
+
+# sum json 
+report = {
+    "model": MODEL_NAME, "phase": "P2_LoRA",
+    "p1_source": str(P1_SOURCE),
+    "vocab_size": int(vocab_size), "dim": int(dim),
+    "base_vocab": int(BASE_VOCAB), "new_tokens": int(num_new),
+    "note": "embeddings frozen in P2; analysis describes inherited P1 best-val config",
+    "hyperparameters": {"lr": LR, "max_steps": MAX_STEPS, "batch_size": BATCH_SIZE,
+                        "grad_accum": GRAD_ACCUM, "seq_len": SEQ_LEN,
+                        "lora_rank": LORA_RANK, "lora_alpha": LORA_ALPHA, "lora_targets": LORA_TARGETS},
+    "norms": {"base_mean": float(base_norms.mean()), "new_mean": float(new_norms.mean()),
+              "new_std": float(new_norms.std()), "cohens_d": float(cohens_d)},
+    "isotropy": {"all": iso_all, "base": iso_base, "new": iso_new},
+    "pca": {"base_90pct": dim90_base, "new_90pct": dim90_new},
+    "pairwise_cosine": {"bb": float(cos_bb.mean()), "nn": float(cos_nn.mean()), "bn": float(cos_bn.mean())},
+    "loss": {"final_train": float(losses[-1]) if 'train_data' in dir() and train_data else None,
+             "final_eval": float(v_losses[-1]) if 'val_data' in dir() and val_data else None,
+             "best_eval": float(min(v_losses)) if 'val_data' in dir() and val_data else None},
+}
+summary_path = RUN_DIR / "p2_llama8b_summary.json"
+summary_path.write_text(json.dumps(report, indent=2))
+print(f"\n[SUMMARY] {summary_path}")
+
+"""## generation / temperature Sweep"""
+
+model.eval()
+model.config.use_cache = True
+
+def generate_wake(prompt, max_new_tokens=256, temperature=0.9, top_p=0.92,
+                  top_k=50, repetition_penalty=1.15, num_return_sequences=1):
+    inputs = tok(prompt, return_tensors="pt").to("cuda")
+    prompt_len = inputs["input_ids"].shape[1]
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs, max_new_tokens=max_new_tokens, temperature=temperature,
+            top_p=top_p, top_k=top_k, repetition_penalty=repetition_penalty,
+            num_return_sequences=num_return_sequences, do_sample=True,
+            pad_token_id=tok.pad_token_id)
+    print(f"-- temp={temperature} | top_p={top_p} | top_k={top_k} | rep={repetition_penalty} --")
+    for i, seq in enumerate(outputs):
+        gen = tok.decode(seq[prompt_len:], skip_special_tokens=True)
+        if num_return_sequences > 1:
+            print(f"\n[{i+1}]")
+        print(gen)
+    print("-" * 60)
+
+def temperature_sweep(prompt, temps=[0.5, 0.7, 0.9, 1.0, 1.2], **kwargs):
+    print(f"PROMPT: {prompt}\n")
+    for t in temps:
+        generate_wake(prompt, temperature=t, **kwargs)
+        print()
+
+generate_wake("riverrun, past Eve and Adam's,")
