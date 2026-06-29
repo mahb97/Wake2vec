@@ -1,10 +1,30 @@
 # Wake2Vec
 
-## TL;DR
+## Overview
 
-A comparative embedding injection study fine-tuning ten LLMs on *Finnegans Wake* by injecting ~44K Joyce-specific tokens into the embedding layer and training in phases: embedding-only warm-up (P1), LoRA behavioural adaptation (P2), and morpheme-compositional alignment under auxiliary geometric losses (P3). Two embedding strategies for P1 (gradient masking for the Llama family, Mistral, Phi, Gemma; WakeOverlay for Qwen, which freezes base and trains only a separate Wake-row matrix), plus frozen-embedding LoRA across all P2 runs. Scale ranges from 1.1B (TinyLlama) to 14B (Qwen) across five architecture families (Llama, Mistral, Qwen, Phi, Gemma) and four base vocab sizes (32K, 128K, 152K, 256K). Three pipelines fully complete (TinyLlama through P3b; Llama 3.2-1B through P3; Llama 3.2-3B with P3 strong running toward a pre-registered manual stop at step 600), Qwen 2.5-14B P1 canonical landed 9 June 2026 with extender to launch from `sentry_step_3000.pt`, Llama 3.1-8B and Mistral 7B in P1, Phi-3.5 queued. Findings so far: (1) the **smaller-model paradox**, generation quality in the Joycean register correlates more strongly with Wake-vocab-share than with model scale; TinyLlama (32K vocab, 58% share) outperforms Llama 3.2-1B (128K vocab, 26% share) on identical data; the constraint becomes the creative advantage; (2) a cross-architecture geometric null, P2's LM objective alone implicitly encodes the morpheme-compositional structure P3's auxiliary losses target, with triplet contrastive loss for word-formation devices structurally unlearnable across all three completed configurations; (3) a LoRA ceiling for 128K-vocab Llama at 3B at val 5.33, confirmed across six consecutive P2 evaluations (range 0.001046), and under strong auxiliary pressure in P3 the model produces brief LM disruption followed by re-equilibration without breaking the wall; (4) **accidental SGDR via manual-resume**, 39 documented cycles across 14 weeks of Qwen 2.5-14B P1 training, one per session restart, producing a continuously-descending val trajectory past the planned cosine schedule's minimum (Loshchilov and Hutter 2017). All training on free Colab T4 GPUs across four Google accounts as an explicit methodological constraint, chosen to test whether linguistically interesting interventions remain reproducible under realistic compute conditions. Very much a work in progress.
+Wake2vec is a comparative study of embedding injection across ten decoder-only language models trained on the text of *Finnegans Wake*. Each model receives approximately 44,000 hand-curated Wake-specific tokens added to its embedding layer and is then trained in three phases: an embedding-only phase (P1; the base transformer is frozen and the new embedding rows are trained under standard language-modelling loss, by gradient masking in most models or by a separate trainable Wake-row matrix in Qwen), a low-rank adaptation phase (P2; the embeddings are frozen and LoRA adapters are applied to the attention and MLP projections), and an auxiliary-alignment phase (P3; geometric losses are imposed on morpheme-group and word-formation-device structure). The design spans an order of magnitude in parameter count (1.1B to 14B), five architecture families, and base vocabularies from 32K to 256K, which produces Wake-vocabulary shares of roughly 17% to 58%. Training runs entirely on free-tier Colab T4 GPUs. This compute condition is treated as an object of study rather than as an incidental limitation, in order to examine whether interventions of this kind remain reproducible and interpretable under constrained resources.
 
-[For when that T4 hits (connecting...)](https://soundcloud.com/houseof_kyri/sets/for-when-that-t4-hits?si=14377a8a628e46cda5971241e0547f5a&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing)
+The principal results are to a substantial degree negative results and controlled comparisons, and they are stated below with the corresponding caution. A guiding heuristic, drawn from Joyce's typographic figure `up:UP` (read as the formula μp → UP), assigns the three phases to the acquisition of micro-units, their routing, and their composition; it is a framing device, not a result.
+
+**Results to date**
+
+1. *A scale-and-data account of generation quality, including the falsification of a simpler claim.* An initial observation, that output in the Joycean register tracks Wake-vocabulary share more closely than parameter count (a 1.1B 32K-vocabulary model produces denser and more recoverable Wake-register text than a 1B 128K-vocabulary model on identical data), was falsified in its simple form by the 14B model, whose output is dense but not recoverable as meaning. The claim is accordingly revised to a three-variable account (vocabulary share, scale, training depth) in which comparable register fidelity is reachable at several points in the space and the small-vocabulary configuration is the compute-efficient one. Generation quality here is assessed qualitatively against the target text by a reader of the Wake, using the interpretive criterion of suspension (meaning held recoverable rather than abolished); there is no validated automatic measure of register fidelity, and this is a limitation, not a metric.
+
+2. *A cross-configuration geometric null.* The injected Wake embeddings converge to near-isotropy (partition-function isotropy approximately 0.998; Mu et al. 2018) regardless of architecture, scale, or initialisation, and the auxiliary geometric losses of P3 do not move during training (the morpheme-alignment loss varies only at the tenth decimal place; embedding drift under sustained morpheme pressure is cosine 0.9998 across 600 steps). The interpretation offered is that the embedding space encodes distributional and semantic structure rather than morphological derivation, so the structure the auxiliary losses request is not present for them to amplify. A token-level analysis is consistent with this: morpheme groups whose surface form diverges from their meaning (for example *evening* relative to *even*) show near-zero compositional-direction consistency. The result is a null and is reported as one.
+
+3. *A controlled comparison isolating the pretraining-data variable.* Holding Wake-vocabulary share (58%), initialisation (spherical), and architecture family constant, two models differing only in pretraining data (Mistral, web-trained; Phi-3.5, filtered "textbook" data) diverge in P1: the web-trained model's validation loss descends substantially and its Wake embeddings reorganise extensively, whereas the textbook-trained model's validation loss does not leave the neighbourhood of its uniform-token baseline and rises after a shallow minimum while its training loss continues to fall. The textbook-trained model memorises the training text without forming a generalising Wake representation. This is the most controlled comparison in the set.
+
+4. *Scale-dependence of a low-rank adaptation ceiling.* The P2 validation loss of a 128K-vocabulary 3B model reaches a fixed value (5.33) within 100 steps and does not move across six consecutive evaluations (range 0.001046). The same configuration at 14B does not reproduce this ceiling; an 8B datapoint, which holds vocabulary and architecture constant against the 3B and varies only scale, is in progress. Validation loss is not directly comparable across models with different vocabulary sizes, because the validation token mixture differs; the comparison here is of trajectory shape (a fixed ceiling versus continued descent), not of absolute value.
+
+5. *A methodological artifact under the compute condition.* The manual session-resume pattern required by free-tier compute resets the learning-rate scheduler at each restart, reproducing the warm-restart schedule of Loshchilov and Hutter (2017) without design. Across 39 documented restarts in the 14B P1 run, each produced a measurable learning-rate-driven descent, and the cumulative trajectory descended past the minimum of the single planned cosine schedule. This is reported as an artifact of the compute condition rather than as a designed contribution.
+
+**Limitations** 
+
+The corpus is a single text; no claim is made about generality. Generation quality is assessed qualitatively by an expert reader against an interpretive criterion, not by a validated metric. Validation loss is not comparable across models with different vocabularies. Free-tier compute imposes interruptions and limits run length, and several runs are incomplete. The project is ongoing; several P2 and P3 phases and three Gemma models are not yet run.
+
+**Status** 
+
+Three pipelines are complete (TinyLlama through P3b; Llama 3.2-1B through P3; Llama 3.2-3B through a P3 phase manually terminated at a pre-registered step). Qwen 2.5-14B and Llama 3.1-8B and Mistral 7B have completed P1 and are in P2. Phi-3.5 is in P1. The three Gemma models are not started.
 
 ---
 
@@ -12,11 +32,11 @@ A comparative embedding injection study fine-tuning ten LLMs on *Finnegans Wake*
 
 | Model | Params | Phase | Status | Notes |
 |---|---|---|---|---|
-| TinyLlama 1.1B | 1.1B | **complete** | Done | P1: loss 8.46 to 0.079. P2: best val 0.6393. P3/P3b: geometric losses null, L_morph solved by P2, L_device structural null. Best ckpt: P3 step 400 (val 3.4188) |
-| Llama 3.2-1B | 1B | **complete** | Done | P3: L_morph=0.0007 (3.5x TinyLlama) but never moved. L_device flat. Same null, different baseline |
-| Llama 3.2-3B | 3B | **complete** | Done (P1 to P3) | P2 walled at val 5.33 across six consecutive evals (range 0.001046). P3 strong launched from P2 step 100, manually terminated at step 600 (val 5.4653). The null fully explained for the first time in the project: (1) geometric null at the embedding level, Wake rows drifted cosine 0.9998 across 600 steps of lambda=50 pressure, L_morph jitter at the tenth decimal place only; (2) the morpheme loss fails because embeddings encode meaning not morphological derivation (evening is not even+ing, so the compositional direction collapses; large groups show direction consistency 0.10 to 0.24); (3) device clustering fails on both axes, intra-group cosine 0.008 to 0.03 (no internal coherence) and inter-centroid cosine 0.41 to 0.73 (no separation); (4) the lasting cost of strong lambdas is the train-val gap widening (0.09 to 0.85), generalisation cost not LM fit. Generation: coherent English with sparse invention, the medium band. Full writeup in `outputs/p3_llama3b_outputs.md` |
-| Llama 3.1-8B | 8B | **P1 complete, P2 running** | P1 done (val 11.485), P2 step 100 | Compositional init at 1.0x radius (the lineup's only model with this strategy). P1 plateaued at val 11.485 (best val 11.3603 at step 1200), the most extreme train-val divergence in the lineup: compositional init bought aggressive train descent that did not generalise. The P1 analysis is the project's cleanest init-vs-dynamics finding: the norm structure is init-dependent (Wake integrated into the base manifold, Cohen's d -1.25 vs spherical -7) but isotropy is init-INDEPENDENT (0.998, the fifth confirmation), proving the 0.998 isotropy is an attractor of the training dynamics, not an artifact of the start, since the 8B began compositional/base-correlated and still converged there. Wake drift 0.88, concentrated on the English-Wake bridge tokens. Generation: fragmented maximal-polyglot babel with the **code-register breakthrough** (a code-trained model leaks code tokens into the Wake babel, a register Joyce never had but the babel-method demands); by the fine-line/suspension criterion the 8B is the over-deformation pole (rich invention but lifelines cut), TinyLlama still holds suspension. P2 LoRA from best-val step 1200, SEQ_LEN 512: step 100 dropped -3.64 (11.36 to 7.72), 2.7x larger than 3B's pre-wall -1.35, descent-shaped not wall-shaped; if it keeps falling, two scales break the LoRA ceiling (scale-gated confirmed beyond Qwen). Writeups in `outputs/p1_llama8b_outputs.md` and `outputs/p1_llama8b_generation.md` |
-| Mistral 7B v0.3 | 7B | **P1 complete, P2 running** | P1 done (val 11.09, best 10.92 @ 1200), P2 launching | Sliding window attention, 32K vocab (44,553 Wake tokens), 58% share (TinyLlama cohort). P1 complete: val descended to 11.0936 at step 3000, still falling; global minimum 10.9181 at step 1200 (first 11.0 break, then a survey-phase plateau, then a second descent). **The deepest embedding learning in the lineup:** Wake drift 0.485 (the most reorganization of any model), most-drifted tokens are full neologisms (learned Wake content, vs the 8B correcting its init), and the FIRST model below the 0.998 isotropy attractor (0.995, corroborated by PCA and pairwise cosine). This inverts the expectation: less isotropy means more learning, the structure is the trace of the work. Hypothesis on the record: Mistral may be the one model where P3's auxiliary losses can move, because its Wake region is the only one not perfectly isotropic. Generation (P1): the maximal-babel pole, the widest register-collision in the lineup, real Wake tokens surfacing (lumapostolopolos, wednesbury), and **emoji at every temperature**, extending the code finding into a general claim (the babel babels the model's moment: code on code-trained models, emoji on the internet-trained one). Fragmented, the dissolution pole; the suspension test is P2. P2 LoRA from best-val step 1200 (10.9181), SEQ_LEN 512: the most favourable suspension prior in the lineup (matched 58% share with TinyLlama + deepest P1 learning). Writeups in `outputs/p1_mistral7b_outputs.md` and `outputs/p1_mistral7b_generation.md` |
+| TinyLlama 1.1B | 1.1B | complete | Done | P1: loss 8.46 to 0.079. P2: best val 0.6393. P3/P3b: auxiliary geometric losses null, L_morph already resolved by P2, L_device a structural null. Best checkpoint: P3 step 400 (val 3.4188) |
+| Llama 3.2-1B | 1B | complete | Done | P3: L_morph 0.0007 (against TinyLlama's 0.0002) but did not move over training. L_device flat. The same null at a different baseline |
+| Llama 3.2-3B | 3B | complete | Done (P1 to P3) | P2 validation reached a fixed value (5.33) across six consecutive evaluations (range 0.001046). P3 (strong auxiliary weighting) was run from the step-100 P2 checkpoint and terminated at a pre-registered step (600; validation 5.4653). The null is characterised at four levels: (1) at the embedding level, the Wake rows drift cosine 0.9998 across 600 steps under lambda=50 morpheme pressure, with the morpheme-alignment loss varying only at the tenth decimal place; (2) the morpheme loss does not move because the embedding directions encode meaning rather than morphological derivation (for *evening* relative to *even* the compositional direction collapses; well-sampled groups show direction consistency 0.10 to 0.24); (3) the device-clustering loss has neither within-category coherence (intra-group cosine 0.008 to 0.03) nor between-category separation (inter-centroid cosine 0.41 to 0.73); (4) the measurable cost of the strong auxiliary weights is a widening train-validation gap (0.09 to 0.85), that is, a generalisation cost rather than a language-modelling cost. Generation is coherent English with sparse invention. See `outputs/p3_llama3b_outputs.md`. |
+| Llama 3.1-8B | 8B | P1 complete, P2 running | P1 done (val 11.485), P2 step 100 | Compositional initialisation at 1.0x radius (the only model in the set using this scheme rather than spherical 1.5x). P1 reached a shallow validation minimum (11.3603 at step 1200), then rose to a plateau (11.485), exhibiting the largest train-validation divergence in the set: training loss continued to descend while validation did not improve. The embedding analysis separates two effects of initialisation. The norm structure is initialisation-dependent (the Wake region is integrated into the base manifold, Cohen's d -1.25, against -7 under spherical initialisation), whereas the isotropy is not: the Wake region reaches 0.998 isotropy despite a base-correlated compositional start, which is consistent with the isotropy being an attractor of the training dynamics rather than an artifact of the initialisation. Wake embedding drift is cosine 0.88, concentrated on truncated-English boundary tokens. Under the suspension criterion the generation is the over-deformation case (dense invention without recoverable meaning); it also surfaces code-register tokens, consistent with the injection drawing on the base model's full pretraining distribution. P2 (LoRA from the step-1200 checkpoint, SEQ_LEN 512): the step-100 validation drop is -3.64 (11.36 to 7.72), larger than the 3B pre-ceiling drop of -1.35 and not of the fixed-ceiling shape. Whether the ceiling is reproduced at this scale is not yet determined. See `outputs/p1_llama8b_outputs.md` and `outputs/p1_llama8b_generation.md`. |
+| Mistral 7B v0.3 | 7B | P1 complete, P2 running | P1 done (val 11.09, min 10.92 @ 1200), P2 step 100 | Sliding-window attention, 32K base vocabulary (44,553 Wake tokens, 58% share). P1 validation descended to 11.0936 at step 3000 and was still falling; the global minimum is 10.9181 at step 1200, after which validation rose (a survey-phase plateau) and then descended again. The embedding analysis records the largest Wake-embedding reorganisation in the set (drift cosine 0.485), with the most-displaced tokens being full neologisms rather than the boundary tokens displaced most in the 8B. The Wake region is the only one to fall below 0.998 isotropy (0.995), corroborated by PCA and pairwise cosine; this is consistent with greater reorganisation depositing more internal structure. A consequence under test: the P3 auxiliary losses, null in every model measured so far, may be non-null here, since pre-existing structure exists for them to amplify. Under the suspension criterion the P1 generation is the dissolution case (maximal register collision, recoverable Wake tokens present, but fragmented); it surfaces non-linguistic (emoji) and code-register tokens, consistent with the injection drawing on the base model's full pretraining distribution. P2 (LoRA from the step-1200 checkpoint) is in progress; the suspension question is decided at generation, not at the loss curve. See `outputs/p1_mistral7b_outputs.md` and `outputs/p1_mistral7b_generation.md`. |
 | Qwen 2.5-14B | 14B | **canonical P1 complete + outputs shipped, P2 running** | P1 done 2026-06-09, P2 step 250 | WakeOverlay arch, Adafactor, SEQ_LEN 128, 43,824 Wake tokens injected (~22% share). 39 documented SGDR cycles via the STEP_OFFSET manual-resume pattern (Loshchilov and Hutter 2017), one per session restart across 14 weeks, producing continuous val descent past the planned cosine minimum. Canonical val 15.09 at step 3000, best val 15.05 at step 2700, the only model never to plateau in P1. Outputs shipped (`outputs/p1_qwen14b_canonical_outputs.md`, `outputs/p1_qwen14b_generation.md`): isotropy 0.998 confirms the geometric null at 14B; generation produced dense polyglot Wake (Chinese characters, continuous compound-mass) that **falsified the simple smaller-model paradox** and forced the refined (share, scale, depth) formulation. P2 LoRA from P1 best-val (step 2700) is **breaking the LoRA wall the 128K Llamas hit**: val 15.05 to 6.72 across 300 steps and still descending (steady -0.31/eval), broke below 7 with no wall or floor (3B walled at 5.33 in 100 steps). Warmup ended at step 300 with the descent still going at peak LR, so the cosine anneal now begins; the run goes the full 3000 steps (the first full P2 in the project, since the walled smaller models early-stopped). LoRA ceiling is scale-gated. P2 uses Trainer-native resume so no SGDR (clean cosine). Extender from canonical step 3000 is post-protocol background work |
 | Phi-3.5 Mini | 3.8B | **P1 running** | Step 300/3000 (textbook-resists signal) | Microsoft, instruct-tuned (only publicly available variant, deviation from base-model convention acknowledged). Confirmed at runtime: 44,500 Wake tokens, **58.2% Wake share** (fourth datapoint in the TinyLlama + Mistral cohort), hidden_dim 3072 identical to Llama 3.2-3B (the 2x2 single-variable partner). Spherical 1.5x init. Training data: FW corpus + Wake lexicon + wake_embedding_groups.jsonl. **First textbook-resists signal at step 300:** train descended 0.76 (12.40 to 11.64) while val stayed flat (12.25 to 12.233), the train-val gap widening. The precise reading: textbook training does not block Wake memorisation (train descends) but resists Wake generalisation (val flat near the 11.25 random baseline), the clean-reasoning representation absorbing Wake tokens locally without reorganising into a generalisable Wake subspace. This is the 2x2 controlled comparison delivering its first result, the training-data axis, and it points at clean priors resisting Wake (contrast: Mistral, same 58% share and internet-trained, did the deepest embedding learning in the lineup). Cross-vocab-share val is not comparable; the 2x2 is decided at generation. Step-400 confirmation pending (GPU cut at 350 last session). Two Phi-specific bugs caught at launch: padding-gap boundary (tokenizer 32,011 vs padded matrix 32,064) and the transformers tie_weights crash (Phi ships untied, tied manually). Textbook-vs-internet hypothesis |
 | Gemma 2 9B | 9B | P1 script ready | Not started | Google architecture, 256K vocab. Lowest expected Wake share (~17%). Test of paradox at the high-vocab extreme |
@@ -55,7 +75,7 @@ The extraction pipeline produces multiple JSONL formats for different training o
 
 ### Tokenizer Augmentation
 
-New forms are added to the tokenizer as **plain tokens** (bare forms + SentencePiece start-of-word variants). Mean-resizing is disabled when expanding the embedding matrix (`resize_token_embeddings(..., mean_resizing=False)`) so that custom initialisation is preserved, and input/output embeddings are tied so the new vectors participate in prediction.
+New forms are added to the tokenizer as plain tokens (bare forms and SentencePiece start-of-word variants). Mean-resizing is disabled when expanding the embedding matrix (`resize_token_embeddings(..., mean_resizing=False)`) so that custom initialisation is preserved, and input/output embeddings are tied so the new vectors participate in prediction.
 
 ### Compositional Initialisation
 
@@ -79,7 +99,7 @@ This places new tokens at a consistent distance from the origin, near the surfac
 
 ## Wake Lexicon
 
-`wake_lexicon.txt` contains 44,989 unique tokens extracted from Finnegans Wake: neologisms, multilingual constructions, accented forms, and Joyce-specific compounds. These get added to whatever base tokenizer we're using. Vocab size matters: smaller tokenizers (32K for TinyLlama, Mistral, Phi-3) require near-full injection of ~44K new tokens, while larger tokenizers (128K for Llama 3.x, 152K, Qwen, 256K, Gemma) already cover many Wake forms natively and need fewer additions. This vocab-size variable turns out to drive one of the project's key findings, see the smaller model paradox below.
+`wake_lexicon.txt` contains 44,989 unique tokens extracted from *Finnegans Wake*: neologisms, multilingual compounds, accented forms, and Joyce-specific coinages. These are added to whichever base tokenizer is in use. For models with larger vocabularies (Llama 3.x has 128K, Qwen 2.5 has 152K, against TinyLlama's 32K), some Wake tokens already exist in the base vocabulary and are not added.
 
 | Model | Base vocab | Wake tokens added | Total vocab |
 |---|---|---|---|
@@ -104,7 +124,7 @@ Freeze the entire transformer. Only the embedding layer is trainable.
 
 - New Wake tokens initialised on a hypersphere (see above)
 - Input and output embeddings are tied
-- A frozen LoRA r=1 adapter on q_proj is included purely for PEFT compatibility with quantized models -- it contributes nothing to training
+- A frozen LoRA r=1 adapter on q_proj is included purely for PEFT compatibility with quantized models; it contributes nothing to training
 
 **Gradient protection strategies:**
 
@@ -123,13 +143,13 @@ wte.weight.register_hook(mask_grad)
 
 ### Phase 2: LoRA Fine-Tune
 
-Load P1 embeddings and freeze them. Apply LoRA adapters to attention and MLP projections. The model learns to *use* the Wake-adapted embeddings through attention redistribution and MLP adaptation.
+Load P1 embeddings and freeze them. Apply LoRA adapters to attention and MLP projections. The model learns to use the Wake-adapted embeddings through attention redistribution and MLP adaptation.
 
 **LoRA targets:** q_proj, k_proj, v_proj, gate_proj, up_proj, down_proj
 
 k_proj is included alongside q/v to allow symmetric reshaping of attention patterns. MLP layers are targeted because Wake morphology requires adaptation of token-to-meaning mappings beyond attention alone.
 
-P2 trains on FW text only (no lexicon). LoRA adapters learn to use frozen embeddings through contextual exposure -- isolated token lists provide less useful context than running prose.
+P2 trains on FW text only (no lexicon). LoRA adapters learn to use frozen embeddings through contextual exposure; isolated token lists provide less useful context than running prose.
 
 ### Phase 3: Morpheme-Compositional Alignment
 
@@ -137,8 +157,8 @@ Unfreeze embeddings with morpheme-aware regularisation. Uses decomposition data 
 
 **Loss components:**
 * L_lm: Standard language modeling loss
-* L_morpheme: Compositional constraint forcing Wake tokens toward component averages
-* L_repulsion: Adversarial term preventing Wake token collapse
+* L_morpheme: Direction consistency. Wake words sharing a morpheme should have parallel displacement vectors from their base forms
+* L_device: Triplet contrastive. Words formed by the same word-formation device (portmanteau, blend, compound, derivation, onomatopoeia) should cluster in embedding space
 * L_norm: Norm hygiene keeping Wake embeddings in distribution
 
 **Composite loss:** `L_total = L_lm + λ_morph * L_morpheme + λ_device * L_device + λ_repulsion * L_repulsion + λ_norm * L_norm`
@@ -158,13 +178,13 @@ A follow-up to P3 with significantly stronger geometric lambdas, testing whether
 | Max steps | 3000 | 1000 |
 | Early stop patience | 5 | 3 |
 
-At P3b's lambdas, L_device contributed 12% of total loss (up from 0.3% in P3). The geometry signal was audible. It still didn't learn. See Key Findings below.
+At P3b's lambdas, L_device contributed 12% of total loss (up from 0.3% in P3). Even at this share of the objective, the device loss did not move. See Key Findings below.
 
 ### Key Findings (TinyLlama P3 Arc)
 
-**L_morph null result as evidence:** L_morph was pinned at 0.0002 across 2,000+ combined P3/P3b steps, never moving even under 500x lambda amplification. This proves P2 (attention routing via LoRA) implicitly learned morphological compositional structure — the morpheme decomposition the Wake demands was already encoded through language modelling alone, before explicit geometric pressure was applied.
+**L_morph null result as evidence:** L_morph was pinned at 0.0002 across 2,000+ combined P3/P3b steps, never moving even under 500x lambda amplification. This is consistent with P2 (attention routing via LoRA) having implicitly learned the morphological compositional structure: the morpheme decomposition the Wake demands was already encoded through language modelling alone, before explicit geometric pressure was applied.
 
-**L_device structural null:** The device triplet contrastive loss (clustering words by word-formation process — portmanteau, blend, compound, derivation, onomatopoeia) never left the 0.17–0.24 random walk range across two lambda regimes (0.05 and 2.0). The diagnosis: embeddings encode meaning and usage, not morphological construction method. A portmanteau of "river"+"run" should be near "river" and "run" in embedding space, not near a portmanteau of "chaos"+"cosmos". The loss was fighting the geometry it's built on — a direction problem, not a volume problem.
+**L_device structural null:** The device triplet contrastive loss (clustering words by word-formation process: portmanteau, blend, compound, derivation, onomatopoeia) never left the 0.17 to 0.24 random walk range across two lambda regimes (0.05 and 2.0). The reading is that embeddings encode meaning and usage, not morphological construction method. A portmanteau of "river"+"run" should be near "river" and "run" in embedding space, not near a portmanteau of "chaos"+"cosmos". The objective is in tension with the geometry it operates on: a direction problem, not a volume problem.
 
 **Alternative geometric objectives (future work):**
 - **Character n-gram overlap**: words sharing substrings pushed closer. Natural for embeddings, captures orthographic play.
@@ -181,7 +201,7 @@ At P3b's lambdas, L_device contributed 12% of total loss (up from 0.3% in P3). T
 
 Qwen 2.5-14B uses a fundamentally different embedding strategy from the Llama/TinyLlama gradient masking approach.
 
-**Problem:** Qwen's 152K-token base vocab makes gradient masking on the full embedding matrix wasteful -- zeroing out 152K rows per backward pass for only ~44K trainable rows.
+**Problem:** Qwen's 152K-token base vocabulary makes gradient masking on the full embedding matrix wasteful, zeroing out 152K rows per backward pass for only ~44K trainable rows.
 
 **Solution:** A separate `nn.Embedding` layer that holds only the Wake token embeddings:
 
@@ -331,17 +351,13 @@ The sweet spot for Wakean generation is **0.9--1.1**: enough temperature to surf
 
 **Key difference from TinyLlama P1:** Llama inserts Wake tokens as embedded neologisms within otherwise coherent Victorian/biblical prose, rather than generating sustained Wakean pastiche. The Wake tokens blend with the surrounding register rather than overwhelming it. This is likely a consequence of the larger model's stronger language priors.
 
-### Llama 3.2-1B P2 (In Progress)
+### Llama 3.2-1B P2 (Complete)
 
-**Step 200/3000:** train 4.03 / val 4.21 (gap 0.18).
+Best checkpoint step 500 (val 4.04); validation rose monotonically thereafter while training loss continued to fall (the train-validation gap crossed 1.0 at step 1500 and reached 1.18 by step 1900), a standard overfit signature. The step-500 checkpoint was carried forward as the P3 source. P3 followed and produced the same null reported for TinyLlama (see the Models table).
 
-Already below P1's final val (5.46) at first eval (step 100). LoRA picked up the frozen Wake embeddings immediately. ~38s/step on T4.
+### Qwen 2.5-14B P1 (Complete)
 
-### Qwen 2.5-14B P1 (In Progress)
-
-**Step ~161/3000:** train 321.48 / val 20.98 at step 100. Both still dropping. ~131s/step on T4.
-
-Higher initial loss values are expected given the WakeOverlay architecture -- the model is learning ~44K new embedding vectors from scratch with a 14B-parameter frozen transformer, compared to Llama's ~1.3K new tokens.
+Canonical step 3000 reached 9 June 2026: validation 15.09 at step 3000, global minimum 15.05 at step 2700. Validation did not plateau within the schedule, descending across 39 documented warm restarts over 14 weeks of free-tier sessions. The higher absolute loss values are expected given the WakeOverlay architecture, which learns ~44K new embedding vectors from scratch against a 14B-parameter frozen transformer; the values are not comparable across vocabularies. P2 (LoRA from the step-2700 checkpoint) is running; see the Models table for current P2 numbers.
 
 ---
 
@@ -357,7 +373,7 @@ Mirrors embedding snapshots and training state to Google Drive at configurable i
 
 ### EmbeddingSnapshot
 
-Saves Wake token embeddings at configurable step intervals. Lightweight (~2MB for Llama, ~340MB for Qwen) -- enables post-hoc analysis of embedding trajectory without full checkpoint overhead.
+Saves Wake token embeddings at configurable step intervals. Lightweight (~2MB for Llama, ~340MB for Qwen), enabling post-hoc analysis of the embedding trajectory without full checkpoint overhead.
 
 ### Resume Strategies
 
@@ -379,7 +395,7 @@ Two resume patterns depending on model architecture:
 - `datasets>=2.21.0`
 - `peft>=0.14`
 - `bitsandbytes>=0.45.0`
-- `triton>=3.0` (requires shim -- see below)
+- `triton>=3.0` (requires shim, see below)
 - `umap-learn`
 - `faiss-cpu`
 - `wordfreq`
@@ -398,8 +414,8 @@ sys.modules['triton.ops.matmul_perf_model'] = fake_perf
 ```
 
 **Other Colab notes:**
-- `warmup_ratio` deprecated in transformers 5.x -- use `warmup_steps` instead
-- bfloat16 tensors cannot call `.numpy()` directly -- cast `.float()` first in analysis cells
+- `warmup_ratio` deprecated in transformers 5.x; use `warmup_steps` instead
+- bfloat16 tensors cannot call `.numpy()` directly; cast `.float()` first in analysis cells
 - Keep `use_cache=False` during training
 - Prefer Adafactor or 8-bit Adam on T4
 - Enable gradient checkpointing in Phase 2 to reduce memory
@@ -410,7 +426,7 @@ sys.modules['triton.ops.matmul_perf_model'] = fake_perf
 - For OOM on T4: reduce `per_device_train_batch_size`, increase `gradient_accumulation_steps`, shorten `SEQ_LEN` (Qwen had to go from 256 to 128), or switch Phase 2 to LoRA
 - Keep random seeds fixed for comparability across phases
 - Keep fp16 off on T4 for this pipeline
-- DriveSentry FUSE hangs are the most common cause of training stalls -- always use the local-first write pattern for saves larger than a few MB
+- DriveSentry FUSE hangs are the most common cause of training stalls; always use the local-first write pattern for saves larger than a few MB
 - STEP_OFFSET only affects file naming in callbacks, not the Trainer progress bar (which always shows local step count)
 
 ---
@@ -441,31 +457,34 @@ For long-running training on preemptible compute, a heartbeat monitoring noteboo
 
 **Complete pipelines:**
 
-- **TinyLlama 1.1B:** P1 + P2 + P3 + P3b. Best checkpoint: P3 step 400 (val 3.4188). Full generation outputs in `outputs/p3b_generation_outputs.md`. The original cross-architecture null finding lives here.
-- **Llama 3.2-1B:** P1 + P2 + P3. Confirms TinyLlama null across configurations. Best checkpoint: P2 step 500 (val 4.04).
-- **Llama 3.2-3B:** P1 + P2 complete. P2 produced the wall at val 5.33 across six consecutive evals (range 0.001046, terminated at step 600). P3 strong running with manual stop pre-registered at step 600 — by step 200, transient-disequilibrium reading confirmed; full pipeline outputs file pending termination.
-- **Qwen 2.5-14B P1 canonical:** Step 3000 landed 9 June 2026. Best val 15.05 @ step 2700, canonical val 15.09 @ step 3000. 39 documented SGDR cycles across 14 weeks. Embedding analysis + generation battery shipped in `outputs/p1_qwen14b_canonical_outputs.md` and `outputs/p1_qwen14b_generation.md`. **The generation result falsified the simple smaller-model paradox**
+- **TinyLlama 1.1B:** P1 + P2 + P3 + P3b. Best checkpoint P3 step 400 (val 3.4188). Generation outputs in `outputs/p3b_generation_outputs.md`. The original cross-architecture null result is established here.
+- **Llama 3.2-1B:** P1 + P2 + P3. Reproduces the TinyLlama null across configurations. Best checkpoint P2 step 500 (val 4.04).
+- **Llama 3.2-3B:** P1 + P2 + P3. P2 reached a fixed value (5.33) across six consecutive evaluations (range 0.001046). P3 (strong auxiliary weighting) ran from the step-100 P2 checkpoint and terminated at the pre-registered step 600 (val 5.4653). Outputs in `outputs/p3_llama3b_outputs.md`.
+- **Qwen 2.5-14B P1:** Canonical step 3000 reached 9 June 2026. Minimum val 15.05 at step 2700, canonical 15.09 at step 3000. 39 documented warm restarts across 14 weeks. Embedding analysis and generation battery in `outputs/p1_qwen14b_canonical_outputs.md` and `outputs/p1_qwen14b_generation.md`. The generation result is not consistent with the simplest statement of the smaller-model conjecture and motivated the refined (share, scale, depth) formulation.
 
 **In progress (P1):**
 
-- **Llama 3.1-8B:** step 2400/3000, val 11.48 (train just broke 100 for the first time at 93.99). Monotonic upward val drift +0.07 across 800 steps and most extreme train-val divergence in lineup. Compositional init + 1.0x radius (the lineup's only experimental init variation; results so far suggest the experimental variation did not pay off). 600 to P1 end.
-- **Mistral 7B v0.3:** step 2350/3000, val 11.32. Survey-phase wobble inside the 11.28-11.35 band continues; eleven consecutive evals in a 0.07-wide band. Second 11.0 break window 150 steps wide through step 2500 (under empirical test from the 3 June tarot prediction). Critical test of refined smaller-model paradox: 58% Wake-vocab-share (matches TinyLlama).
-- **Llama 3.2-3B P3 strong:** step 200/1000, val 5.49 (+0.16 above P2 wall, recovering). Manual termination at step 600 unless val drops below 5.40.
+- **Phi-3.5 Mini (3.8B):** Step 700/3000. Validation reached a shallow minimum (12.233 at step 300) and has risen monotonically since (12.273 at step 700) while training loss continues to descend (10.915 at step 700). The run continues to 3000 for protocol consistency. 32K vocab, ~58% Wake share (TinyLlama and Mistral cohort), spherical 1.5x init. Instruct-tuned (the only publicly available variant; deviation from the base-model convention noted).
+
+**In progress (P2):**
+
+- **Llama 3.1-8B:** LoRA from the step-1200 P1 checkpoint. Step 100 at val 7.72 (train 7.82), a drop of 3.64 from the P1 minimum. The decider evaluation at step 200, which separates a reproduced ceiling from continued descent, is pending; repeated free-tier interruptions have prevented it.
+- **Mistral 7B v0.3:** LoRA from the step-1200 P1 checkpoint (val 10.9181). Step 100 at val 7.33 (train 7.63), a drop of 3.58, with validation below training. Next evaluation at step 200.
+- **Qwen 2.5-14B:** LoRA from the step-2700 P1 checkpoint. Step 450 at val 6.363, a drop of roughly 8.7 from the P1 minimum, with no plateau; the per-evaluation decrement is decaying as the cosine learning rate anneals. Running the full 3000 steps.
 
 **Queued to launch:**
 
-- **Phi-3.5 Mini (3.8B):** P1 script ready (`wake2vec_phi35_p1_clean.py`). Launches as soon as 3B P3 terminates at step 600. Microsoft textbook-quality training data comparison; 32K vocab, ~58% Wake share expected (joins TinyLlama+Mistral cohort). Spherical 1.5x init (cohort match). Training data: FW + lexicon + wake_embedding_groups.jsonl. Methodological flag: instruct-tuned (only publicly available variant), acknowledged deviation from the lineup's base-model convention.
-- **Qwen 2.5-14B extender:** launches from `sentry_step_3000.pt` with `STEP_OFFSET=3000`. Tests whether the 39-cycle accidental SGDR mechanism keeps finding descent past the canonical endpoint. Prior on continued descent is very strong given 39 confirmed reproductions in the canonical.
-- **Gemma 2 9B:** P1 script ready. Google architecture, 256K vocab, lowest expected Wake share (~17%). Critical test of paradox at the high-vocab extreme.
-- **Gemma 3n E2B & E4B:** P1 scripts pending. Efficient-architecture variants (PLE + MatFormer).
+- **Qwen 2.5-14B extender:** launches from `sentry_step_3000.pt` with `STEP_OFFSET=3000`. Tests whether the manual-resume warm-restart mechanism continues to find descent past the canonical endpoint.
+- **Gemma 2 9B:** P1 script ready. Google architecture, 256K vocab, lowest expected Wake share (~17%). Test of the smaller-model conjecture at the high-vocab extreme.
+- **Gemma 3n E2B and E4B:** P1 scripts pending. Efficient-architecture variants (PLE and MatFormer).
 
-**Key findings established:**
+**Key findings to date:**
 
-- **Refined smaller-model paradox** (falsifying the original simple version): generation quality in the Joycean register is achievable at multiple points in (Wake-vocab-share, model scale, training depth) space. Wake-vocab-share at ~58% (TinyLlama-class) is the **compute-efficient** configuration; scale at 14B with extended training is the **brute-force-efficient** configuration. The minimal-computing argument prefers the compute-efficient path. The original paradox claim was an empirical observation about share alone; the refined claim accounts for the three-axis trade-off the Qwen result revealed.
-- **Cross-architecture geometric null** (confirmed in four configurations): TinyLlama P3, Llama 3.2-1B P3, Llama 3.2-3B P3 strong, Qwen 2.5-14B P1 canonical, they all produce Wake region isotropy at 0.998. P2's LM objective alone implicitly encodes the morpheme-compositional structure P3's auxiliary losses target. Triplet contrastive loss for word-formation devices is structurally unlearnable because Wake tokens distribute on a near-uniform sphere with nowhere preferential for clusters to form.
-- **LoRA ceiling for 128K-vocab Llama at 3B**: val 5.33 confirmed across six consecutive P2 evaluations (range 0.001046). Under strong auxiliary pressure in P3, the model produces brief LM disruption followed by re-equilibration without breaking the wall. The lasting cost of strong λs is the train-val gap widening (0.09 in P2 → 0.74 in P3 strong), a generalisation cost, not LM fit cost.
-- **Accidental SGDR via manual-resume** (39 documented cycles): the STEP_OFFSET-based manual-resume pattern necessitated by free Colab T4 cuts produces a near-perfect reproduction of the Loshchilov-Hutter SGDR schedule. Each of 39 sessions across Qwen's 14-week training produced a measurable train-spike-followed-by-val-descent pattern. Mechanism is robust at scale, not anecdotal.
-- **Bridge tokens identified**: the most-changed Wake tokens after training (`wher`, `leas`, `hing`, `throug`, `befor`, `nig`, `hough`, `bri`, `thos`, `tch`) are truncated common English words, the Wake tokens that bridge between Wake-specific content and base English at sentence boundaries. The model concentrates learning on the English-Wake boundary.
+- **Refined smaller-model conjecture** (the simple version is not supported): generation quality in the Joycean register appears achievable at multiple points in (Wake-vocab-share, model scale, training depth) space. A ~58% Wake-vocab-share (TinyLlama-class) is the compute-efficient configuration; 14B scale with extended training is an alternative, compute-intensive route. The original claim concerned share alone; the refined claim accounts for the three-axis trade-off the Qwen result revealed. Generation quality is assessed qualitatively, not by a validated metric.
+- **Cross-architecture geometric null** (four configurations): TinyLlama P3, Llama 3.2-1B P3, Llama 3.2-3B P3, and Qwen 2.5-14B P1 all show Wake-region isotropy at 0.998. The P2 language modelling objective alone appears to encode the morpheme-compositional structure the P3 auxiliary losses target. The device triplet loss does not move, consistent with embeddings distributing on a near-uniform sphere on which there is no preferential direction for clusters to form.
+- **Low-rank adaptation ceiling for 128K-vocab Llama at 3B**: val 5.33 across six consecutive P2 evaluations (range 0.001046). Under strong auxiliary pressure in P3 the model shows brief LM disruption followed by re-equilibration without crossing the fixed value. The measurable cost of strong auxiliary weights is a widening train-validation gap (0.09 in P2 to 0.74 in P3), a generalisation cost rather than an LM-fit cost. Whether the ceiling holds at larger scale is under test (the 8B P2 decider eval is pending).
+- **Warm restarts via manual resume** (39 documented): the STEP_OFFSET manual-resume pattern, necessitated by free-tier interruptions, resets the cosine scheduler each session and reproduces the structure of an SGDR schedule (Loshchilov and Hutter 2017). Each of 39 sessions across Qwen's 14-week run shows a train-spike-then-val-descent pattern.
+- **Boundary tokens**: the most-displaced Wake tokens after training (`wher`, `leas`, `hing`, `throug`, `befor`, `nig`, `hough`, `bri`, `thos`, `tch`) are truncated common English words, the tokens that sit at the Wake-to-base-English boundary. Learning concentrates there.
 
 **Infrastructure:**
 
