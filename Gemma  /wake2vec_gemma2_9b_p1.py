@@ -25,26 +25,12 @@ The model trains on both the Finnegans Wake corpus and the Wake lexicon
 file directly, giving the embeddings exposure to tokens both in context
 and in isolation.
 
-Based on the Llama-3.1-8B script. Main differences:
-- Gemma 2 9B: 26 layers, hidden_size=2,304, 8 attn heads (4 KV via GQA)
-- 256K base vocab — LARGEST in the lineup
-- Wake injection likely MINIMAL — most Wake forms may already be tokenisable
-- Interleaved local (4,096) / global (8,192) attention
-- Gemma 2 ties input/output embeddings by default
-- ~6-7GB VRAM at 4-bit. SEQ_LEN 512 should fit comfortably.
-
 ## Key research questions
 - Does the smaller model paradox apply at 256K vocab?
 - Does the interleaved attention architecture interact differently with
   Wake's nested parenthetical structure?
 - If injection count is small (<5K), does the experiment become a
   negative result (i.e. nothing to compare)?
-
-## Colab 2026.04 compatibility
-- Triton shim for bnb / triton 3.x (no-op if already patched)
-- bitsandbytes >= 0.46.1 required (run !pip install -U if needed)
-- Use `dtype` not `torch_dtype` (deprecated in transformers 5.x)
-- HuggingFace login required 
 
 -------------------------------------------------------------
 
@@ -55,9 +41,6 @@ os.environ["TRANSFORMERS_NO_TORCHAO"] = "1"
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 # triton shim 
-# bnb 0.45.x imports triton.ops.matmul_perf_model which was
-# removed in triton 3.x. Newer bnb (>=0.46.1) doesn't need this
-# but the shim is harmless if already patched.
 import types, sys
 _fake = types.ModuleType("triton.ops")
 _fake.matmul_perf_model = types.ModuleType("triton.ops.matmul_perf_model")
@@ -88,6 +71,7 @@ gc.collect()
 from google.colab import drive
 drive.mount('/content/drive')
 
+# gated 
 from huggingface_hub import login
 login()
 
@@ -239,13 +223,7 @@ val_ds = BlockDataset(val_blocks, SEQ_LEN)
 print(f"  Train: {len(train_ds)} blocks")
 print(f"  Val: {len(val_ds)} blocks")
 
-"""## model setup
-
-Gemma 2 9B specifics:
-- Ties input/output embeddings by default 
-- Uses interleaved local/global attention
-- attn_implementation="eager" for stability on T4
-"""
+"""## model setup"""
 
 from transformers import AutoModelForCausalLM, BitsAndBytesConfig, set_seed
 from peft import LoraConfig, get_peft_model
@@ -272,8 +250,6 @@ model = AutoModelForCausalLM.from_pretrained(
 
 model.config.use_cache = False
 model.config.tie_word_embeddings = True
-if hasattr(model, "tie_weights"):
-    model.tie_weights()
 
 # frozen LoRA r=1 (PEFT compatibility with quant training)
 peft_cfg = LoraConfig(
@@ -1037,3 +1013,49 @@ summary_path = RUN_DIR / "p1_gemma2_9b_summary.json"
 summary_path.write_text(json.dumps(report, indent=2))
 print(f"\n[SUMMARY] Saved to {summary_path}")
 print(json.dumps(report, indent=2))
+
+"""## Cell 11: generation & temperature sweep"""
+
+model.eval()
+model.config.use_cache = True
+
+def generate_wake(prompt, max_new_tokens=256, temperature=0.9, top_p=0.92,
+                  top_k=50, repetition_penalty=1.15, num_return_sequences=1):
+    inputs = tok(prompt, return_tensors="pt").to("cuda")
+    prompt_len = inputs["input_ids"].shape[1]
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs, max_new_tokens=max_new_tokens, temperature=temperature,
+            top_p=top_p, top_k=top_k, repetition_penalty=repetition_penalty,
+            num_return_sequences=num_return_sequences, do_sample=True,
+            pad_token_id=tok.pad_token_id)
+    print(f"-- temp={temperature} | top_p={top_p} | top_k={top_k} --")
+    for i, seq in enumerate(outputs):
+        gen = tok.decode(seq[prompt_len:], skip_special_tokens=True)
+        if num_return_sequences > 1:
+            print(f"\n[{i+1}]")
+        print(gen)
+    print("-" * 60)
+
+
+def temperature_sweep(prompt, temps=[0.5, 0.7, 0.9, 1.0, 1.2], **kwargs):
+    """same prompt at multiple temperatures for comparison."""
+    print(f"PROMPT: {prompt}\n")
+    for t in temps:
+        generate_wake(prompt, temperature=t, **kwargs)
+        print()
+
+
+PROMPT = "riverrun, past Eve and Adam's,"
+
+# single generation at the working temperature
+print("single generation (temp=0.9)"); 
+generate_wake(PROMPT)
+
+# temperature sweep (0.5 to 1.2) for the density gradient
+print("temp sweep"); 
+temperature_sweep(PROMPT)
+
+# 3 samples at high temp 
+print("3 samples (temp=1.1, 512 tokens)"); 
+generate_wake(PROMPT, temperature=1.1, max_new_tokens=512, num_return_sequences=3)
