@@ -33,9 +33,6 @@ with the LoRA-ceiling wall finding (val 5.33 across 6 evals on 3B P2).
    but the JSON copy is cheap insurance)
 5. **SentryMirror for LoRA-only** is small — LoRA adapter is ~10-50MB regardless
    of base model size. Save aggressively (every 25 steps).
-6. **STEP_OFFSET resume pattern** continues to produce SGDR cycles. Each session
-   resume = one cycle. Expected ~10-30 cycles across the P2 run if it runs the
-   full 3000 steps.
 
 ## Colab 2026.06 compatibility
 
@@ -133,7 +130,6 @@ LORA_TARGETS = ["q_proj", "k_proj", "v_proj", "gate_proj", "up_proj", "down_proj
 # resume 
 RESUME_FROM = None
 # RESUME_FROM = SENTRY / "checkpoint-200"
-STEP_OFFSET = 0  
 
 print("Wake2Vec P2 on Qwen 2.5-14B with LoRA config")
 print(f"  Model: {MODEL_NAME}")
@@ -147,7 +143,7 @@ print(f"  Eval cadence: every {EVAL_STEPS} steps")
 print(f"  Save cadence: every {SAVE_STEPS} steps (aggressive — Colab cut insurance)")
 print(f"  LoRA: r={LORA_RANK}, α={LORA_ALPHA}, dropout={LORA_DROPOUT}")
 print(f"  LoRA targets: {LORA_TARGETS}")
-print(f"  Resume: {RESUME_FROM} (STEP_OFFSET={STEP_OFFSET})")
+print(f"  Resume: {RESUME_FROM}")
 
 """## tokenizer (deterministic rebuild from wake_lexicon.txt)"""
 
@@ -335,7 +331,7 @@ def has_weights(ck):
 class FullCheckpoint(TrainerCallback):
     def on_save(self, args, state, control, **kwargs):
         try:
-            step = state.global_step + STEP_OFFSET  # logical step (resume-aware)
+            step = state.global_step
             full_ck = FULL_CHECKPOINTS / f"step_{step:04d}"
             if full_ck.exists():
                 shutil.rmtree(full_ck)
@@ -374,7 +370,7 @@ class SentryMirror(TrainerCallback):
 class TrainerStateMirror(TrainerCallback):
     def on_save(self, args, state, control, **kw):
         try:
-            step = state.global_step + STEP_OFFSET
+            step = state.global_step 
             # get the latest checkpoint's trainer_state.json in LOCAL_RUN
             cks = sorted(LOCAL_RUN.glob("checkpoint-*"),
                          key=lambda p: int(p.name.split("-")[-1]), reverse=True)
@@ -490,7 +486,6 @@ print("training for Wake2vec P2: Qwen 2.5-14B LoRA")
 print(f"  Train: {len(train_ds)} blocks | Val: {len(val_ds)} blocks")
 print(f"  Steps: {MAX_STEPS} | Effective batch: {BATCH_SIZE * GRAD_ACCUM}")
 print(f"  VRAM before training: {torch.cuda.memory_allocated(0) / 1e9:.2f} GB")
-print(f"  STEP_OFFSET (logical): {STEP_OFFSET}")
 
 # train
 t0 = time.time()
