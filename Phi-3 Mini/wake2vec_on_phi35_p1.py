@@ -766,6 +766,4 @@ def temperature_sweep(prompt, temps=[0.5, 0.7, 0.9, 1.0, 1.2], **kwargs):
         generate_wake(prompt, temperature=t, **kwargs)
         print()
 
-
-# prompt
-generate_wake("riverrun, past Eve and Adam's,")
+temperature_sweep("riverrun, past Eve and Adam's,")
