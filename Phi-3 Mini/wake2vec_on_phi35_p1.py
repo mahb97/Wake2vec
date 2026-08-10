@@ -546,7 +546,7 @@ from numpy.linalg import norm as l2
 from scipy import stats
 from sklearn.decomposition import PCA
 
-E_post = final_emb.numpy()
+E_post = final_emb.to(torch.float32).numpy() 
 vocab_size, dim = E_post.shape
 num_new_tokens = vocab_size - BASE_VOCAB
 E_base = E_post[:BASE_VOCAB]
