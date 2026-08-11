@@ -275,7 +275,7 @@ print(f"  Saved: {RUN_DIR / 'embeddings_frozen.pt'}  shape {E_frozen.shape}")
 
 """## callbacks"""
 
-import time, json
+import time, json, shutil
 
 def has_weights(ck):
     return (ck / "adapter_model.safetensors").exists() or (ck / "pytorch_model.bin").exists()
