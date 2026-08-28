@@ -131,7 +131,8 @@ LORA_TARGETS = ["q_proj", "k_proj", "v_proj", "gate_proj", "up_proj", "down_proj
 BASE_VOCAB = 32768
 
 # loss weights 
-LAMBDA_MORPH = 50.0         
+MORPH_LOSS_MODE = "cosine"
+LAMBDA_MORPH = 1.0 if MORPH_LOSS_MODE == "cosine" else 50.0
 LAMBDA_DEVICE = 2.0         
 LAMBDA_REPULSION = 0.05     
 LAMBDA_NORM = 0.01          
@@ -156,6 +157,9 @@ print(f"  Steps: {MAX_STEPS}")
 print(f"  LR: {LR}")
 print(f"  Batch: {BATCH_SIZE} x {GRAD_ACCUM} = {BATCH_SIZE * GRAD_ACCUM}")
 print(f"  LoRA rank: {LORA_RANK}, targets: {LORA_TARGETS}")
+print(f"  Morph loss mode: {MORPH_LOSS_MODE}"
+      + ("  (scale-free cosine; lambda recalibrated from the legacy 50.0)"
+         if MORPH_LOSS_MODE == "cosine" else "  (LEGACY squared-deviation, scale-dependent)"))
 print(f"  Loss weights: morph={LAMBDA_MORPH}, device={LAMBDA_DEVICE}, repulsion={LAMBDA_REPULSION}, norm={LAMBDA_NORM}")
 print(f"  Morpheme data: {MORPHEME_JSONL}")
 print(f"  Device data: {DEVICE_JSONL}")
@@ -512,7 +516,6 @@ class MorphemeIndex:
         print(f"MorphemeIndex: {self.n_groups} groups, {self.total_pairs} pairs (vectorized)")
 
     def compute_loss(self, embed_weight):
-        """Vectorized compositional direction consistency loss."""
         if self.n_groups == 0 or self.total_pairs == 0:
             return torch.tensor(0.0, device=self.device)
 
@@ -527,15 +530,20 @@ class MorphemeIndex:
         dim = directions.shape[1]
         expand_groups = self.pair_groups.unsqueeze(1).expand(-1, dim)
 
-        group_sums = torch.zeros(self.n_groups, dim, device=self.device)
+        group_sums = torch.zeros(self.n_groups, dim,
+                                device=self.device, dtype=directions.dtype)
         group_sums.scatter_add_(0, expand_groups, directions)
         group_means = group_sums / self.group_sizes.unsqueeze(1)
 
-        pair_means = group_means[self.pair_groups]
-        deviations = ((directions - pair_means) ** 2).mean(dim=1)
+        if MORPH_LOSS_MODE == "sqdev":
+            pair_means = group_means[self.pair_groups]
+            deviations = ((directions - pair_means) ** 2).mean(dim=1)
+            return deviations.mean()
 
-        return deviations.mean()
-
+        d_unit = F.normalize(directions, dim=1, eps=1e-8)
+        g_unit = F.normalize(group_means, dim=1, eps=1e-8)
+        cos = (d_unit * g_unit[self.pair_groups]).sum(dim=1)
+        return (1.0 - cos).mean()
 
 morph_index = MorphemeIndex(morpheme_groups, tok, device="cuda")
 
@@ -688,7 +696,8 @@ class MorphemeTrainer(Trainer):
         super().__init__(*args, **kwargs)
         self.loss_log = loss_log if loss_log is not None else []
 
-    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+    def compute_loss(self, model, inputs, return_outputs=False,
+                     num_items_in_batch=None, **kwargs):
         outputs = model(**inputs)
         lm_loss = outputs.loss
 
@@ -722,6 +731,9 @@ class MorphemeTrainer(Trainer):
                   f"repul={repulsion_loss.item():.6f}(*{LAMBDA_REPULSION}) "
                   f"norm={norm_loss.item():.4f}(*{LAMBDA_NORM}) "
                   f"total={total_loss.item():.4f}")
+          
+        if num_items_in_batch is not None:
+            total_loss = total_loss / self.args.gradient_accumulation_steps
 
         if return_outputs:
             return total_loss, outputs
