@@ -175,6 +175,17 @@ so truncation cannot account for it.
 in the whole corpus (`cettehis`, `sengentide`, `athemisthued`, `coolpose`, `rooksacht`, `eddaying`). Hapax legomena from a single text, installed as embedding rows in P1, retrieved and placed in syntax by P2. `cettehis` recurs across two independent
 samples, so the rows are consistently addressable.
 
+### The within-family series
+
+The vocabulary-matched comparison runs through the Llama family and TinyLlama, where lexicon, corpus and protocol are held constant across an order of magnitude of scale.
+
+| Model | Vocab | Wake share | Generation character |
+|---|---|---|---|
+| TinyLlama 1.1B (P3b) | 32K | ~58% | suspension; genuine Wake proper nouns and multilingual material |
+| Llama 3.2-1B (P2) | 128K | ~26% | sustained Wake prose inside a Victorian epistolary frame |
+| Llama 3.2-3B (P2) | 128K | ~26% | nine registers across the battery, no sustained Wake prose |
+| **Llama 3.1-8B (P2)** | **128K** | **~26%** | **suspension, ~70% of distinctive forms verified as retrieved lexicon** |
+
 ## Implications for P3
 
 The Wake region sits at 0.998453 isotropy, the attractor value, and higher than the base vocabulary's 0.9896. The standing structural diagnosis for the geometric null is that near-perfect isotropy leaves no pre-existing structure for the 
