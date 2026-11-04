@@ -1,0 +1,15 @@
+{
+  "embeddings": "/content/drive/MyDrive/wake2vec_mistral7b_p3_morpheme_strong/embeddings_pre_p3.pt",
+  "n_perm": 500,
+  "observed_L_morph": 0.6699698567390442,
+  "observed_consistency": 0.3300301432609558,
+  "null_mean": 0.7157312631607056,
+  "null_sd": 0.000927645480260253,
+  "null_ci95": [
+    0.7138819694519043,
+    0.7173966765403748
+  ],
+  "analytic_estimate": 0.7225940150415665,
+  "z": -49.330705959805805,
+  "empirical_p": 0.0
+}
