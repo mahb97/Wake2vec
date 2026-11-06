@@ -1,0 +1,2611 @@
+{
+  "model": "mistralai/Mistral-7B-v0.3",
+  "phase": "P3_morpheme_strong_lambdas",
+  "adapter_source": "/content/drive/MyDrive/wake2vec_mistral7b_p2_lora/full_checkpoints/step_0600",
+  "emb_source": "/content/drive/MyDrive/wake2vec_mistral7b_p2_lora/embeddings_frozen.pt",
+  "checkpoint": "final",
+  "vocab_size": 77321,
+  "dim": 4096,
+  "base_vocab": 32768,
+  "new_tokens": 44553,
+  "hyperparameters": {
+    "lr": 2e-05,
+    "warmup_ratio": 0.1,
+    "weight_decay": 0.01,
+    "max_steps": 1000,
+    "batch_size": 1,
+    "grad_accum": 16,
+    "lora_rank": 8,
+    "lora_alpha": 16,
+    "lora_targets": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "seq_len": 256,
+    "lambda_morph": 1.0,
+    "lambda_device": 2.0,
+    "device_triplets": 64,
+    "device_margin": 0.2,
+    "lambda_repulsion": 0.05,
+    "lambda_norm": 0.01,
+    "repulsion_threshold": 0.95,
+    "early_stop_patience": 4,
+    "min_group_size": 3
+  },
+  "null_breaker": {
+    "isotropy_delta": {
+      "iso_all_pre": 0.8913524150848389,
+      "iso_all_post": 0.8867694735527039,
+      "iso_base_pre": 0.9604796767234802,
+      "iso_base_post": 0.9604796767234802,
+      "iso_new_pre": 0.993415117263794,
+      "iso_new_post": 0.9934499859809875,
+      "wake_isotropy_delta": 3.4868717193603516e-05,
+      "wake_mean_cos_pre": -1.020001855067676e-05,
+      "wake_mean_cos_post": -1.0919178748736158e-05
+    },
+    "direction_consistency_delta": {
+      "n_groups_paired": 130,
+      "mean_direction_consistency_pre": 0.4191110515823731,
+      "mean_direction_consistency_post": 0.4998606110994632,
+      "mean_delta": 0.08074955951709013,
+      "n_improved": 130,
+      "max_abs_delta": 0.1968713104724884
+    },
+    "permutation_pre": {
+      "label": "PRE (P2 embeddings, no P3 gradient)",
+      "n_pairs": 1413,
+      "n_groups": 130,
+      "n_perm": 500,
+      "observed_L_morph": 0.6699698567390442,
+      "observed_consistency": 0.3300301432609558,
+      "null_mean": 0.7157312631607056,
+      "null_sd": 0.000927645480260253,
+      "excess_over_chance": 0.04576140642166138,
+      "z": -49.330705959805805,
+      "n_groups_below_z3": 15,
+      "pairs_below_z3": 215,
+      "per_group": [
+        {
+          "morpheme": "-ion",
+          "n_pairs": 69,
+          "observed_L": 0.6133157014846802,
+          "observed_consistency": 0.3866842985153198,
+          "null_L": 0.8330432176589966,
+          "excess": 0.2197275161743164,
+          "z": -18.424217224121094
+        },
+        {
+          "morpheme": "-ation",
+          "n_pairs": 37,
+          "observed_L": 0.5491119623184204,
+          "observed_consistency": 0.4508880376815796,
+          "null_L": 0.8059417009353638,
+          "excess": 0.25682973861694336,
+          "z": -16.727779388427734
+        },
+        {
+          "morpheme": "-fication",
+          "n_pairs": 3,
+          "observed_L": 0.017216583713889122,
+          "observed_consistency": 0.9827834367752075,
+          "null_L": 0.4588046967983246,
+          "excess": 0.4415881037712097,
+          "z": -8.751124382019043
+        },
+        {
+          "morpheme": "-ition",
+          "n_pairs": 5,
+          "observed_L": 0.2689594328403473,
+          "observed_consistency": 0.7310405969619751,
+          "null_L": 0.577133059501648,
+          "excess": 0.30817362666130066,
+          "z": -8.356340408325195
+        },
+        {
+          "morpheme": "-ure",
+          "n_pairs": 10,
+          "observed_L": 0.48399001359939575,
+          "observed_consistency": 0.5160099864006042,
+          "null_L": 0.6884288191795349,
+          "excess": 0.20443880558013916,
+          "z": -8.061180114746094
+        },
+        {
+          "morpheme": "-ive",
+          "n_pairs": 18,
+          "observed_L": 0.6301488876342773,
+          "observed_consistency": 0.36985111236572266,
+          "null_L": 0.7521731853485107,
+          "excess": 0.1220242977142334,
+          "z": -5.987451076507568
+        },
+        {
+          "morpheme": "-head",
+          "n_pairs": 3,
+          "observed_L": 0.172727569937706,
+          "observed_consistency": 0.8272724151611328,
+          "null_L": 0.45700791478157043,
+          "excess": 0.28428035974502563,
+          "z": -5.796456336975098
+        },
+        {
+          "morpheme": "-ar",
+          "n_pairs": 11,
+          "observed_L": 0.5632154941558838,
+          "observed_consistency": 0.4367845058441162,
+          "null_L": 0.7016010880470276,
+          "excess": 0.1383855938911438,
+          "z": -5.775360584259033
+        },
+        {
+          "morpheme": "suc-",
+          "n_pairs": 8,
+          "observed_L": 0.5110846757888794,
+          "observed_consistency": 0.4889153242111206,
+          "null_L": 0.6563332676887512,
+          "excess": 0.14524859189987183,
+          "z": -5.127555847167969
+        },
+        {
+          "morpheme": "-ish",
+          "n_pairs": 11,
+          "observed_L": 0.5719414949417114,
+          "observed_consistency": 0.4280585050582886,
+          "null_L": 0.70108962059021,
+          "excess": 0.12914812564849854,
+          "z": -5.034613609313965
+        },
+        {
+          "morpheme": "-ance",
+          "n_pairs": 5,
+          "observed_L": 0.42488622665405273,
+          "observed_consistency": 0.5751137733459473,
+          "null_L": 0.5765781402587891,
+          "excess": 0.15169191360473633,
+          "z": -4.165252685546875
+        },
+        {
+          "morpheme": "-sy",
+          "n_pairs": 9,
+          "observed_L": 0.5622274279594421,
+          "observed_consistency": 0.43777257204055786,
+          "null_L": 0.6765024065971375,
+          "excess": 0.11427497863769531,
+          "z": -4.012237071990967
+        },
+        {
+          "morpheme": "-ious",
+          "n_pairs": 10,
+          "observed_L": 0.6044563055038452,
+          "observed_consistency": 0.3955436944961548,
+          "null_L": 0.6876477003097534,
+          "excess": 0.0831913948059082,
+          "z": -3.17691969871521
+        },
+        {
+          "morpheme": "-ina",
+          "n_pairs": 3,
+          "observed_L": 0.300292044878006,
+          "observed_consistency": 0.6997079849243164,
+          "null_L": 0.4606228768825531,
+          "excess": 0.16033083200454712,
+          "z": -3.0961363315582275
+        },
+        {
+          "morpheme": "mis-",
+          "n_pairs": 13,
+          "observed_L": 0.6570014357566833,
+          "observed_consistency": 0.34299856424331665,
+          "null_L": 0.7211800813674927,
+          "excess": 0.06417864561080933,
+          "z": -3.024580478668213
+        },
+        {
+          "morpheme": "-ee",
+          "n_pairs": 4,
+          "observed_L": 0.41214609146118164,
+          "observed_consistency": 0.5878539085388184,
+          "null_L": 0.5324574708938599,
+          "excess": 0.12031137943267822,
+          "z": -2.893010139465332
+        },
+        {
+          "morpheme": "sug-",
+          "n_pairs": 3,
+          "observed_L": 0.3119327127933502,
+          "observed_consistency": 0.6880673170089722,
+          "null_L": 0.4589928984642029,
+          "excess": 0.14706018567085266,
+          "z": -2.8672237396240234
+        },
+        {
+          "morpheme": "se-",
+          "n_pairs": 31,
+          "observed_L": 0.7495403289794922,
+          "observed_consistency": 0.2504596710205078,
+          "null_L": 0.7948206067085266,
+          "excess": 0.045280277729034424,
+          "z": -2.810418128967285
+        },
+        {
+          "morpheme": "-ty",
+          "n_pairs": 27,
+          "observed_L": 0.7422410249710083,
+          "observed_consistency": 0.2577589750289917,
+          "null_L": 0.7854417562484741,
+          "excess": 0.04320073127746582,
+          "z": -2.7279579639434814
+        },
+        {
+          "morpheme": "-ful",
+          "n_pairs": 3,
+          "observed_L": 0.33439087867736816,
+          "observed_consistency": 0.6656091213226318,
+          "null_L": 0.4611409604549408,
+          "excess": 0.12675008177757263,
+          "z": -2.723137140274048
+        },
+        {
+          "morpheme": "bi-",
+          "n_pairs": 15,
+          "observed_L": 0.6766666173934937,
+          "observed_consistency": 0.32333338260650635,
+          "null_L": 0.7367459535598755,
+          "excess": 0.060079336166381836,
+          "z": -2.636425733566284
+        },
+        {
+          "morpheme": "-th",
+          "n_pairs": 24,
+          "observed_L": 0.7331891655921936,
+          "observed_consistency": 0.2668108344078064,
+          "null_L": 0.7773768901824951,
+          "excess": 0.044187724590301514,
+          "z": -2.476083755493164
+        },
+        {
+          "morpheme": "di-",
+          "n_pairs": 27,
+          "observed_L": 0.7474731206893921,
+          "observed_consistency": 0.2525268793106079,
+          "null_L": 0.7861583232879639,
+          "excess": 0.03868520259857178,
+          "z": -2.2488512992858887
+        },
+        {
+          "morpheme": "-man",
+          "n_pairs": 10,
+          "observed_L": 0.6362868547439575,
+          "observed_consistency": 0.3637131452560425,
+          "null_L": 0.6913100481033325,
+          "excess": 0.055023193359375,
+          "z": -2.1919338703155518
+        },
+        {
+          "morpheme": "cat-",
+          "n_pairs": 4,
+          "observed_L": 0.4404735267162323,
+          "observed_consistency": 0.5595264434814453,
+          "null_L": 0.5304263830184937,
+          "excess": 0.08995285630226135,
+          "z": -2.1354005336761475
+        },
+        {
+          "morpheme": "com-",
+          "n_pairs": 26,
+          "observed_L": 0.7469891905784607,
+          "observed_consistency": 0.2530108094215393,
+          "null_L": 0.7823297381401062,
+          "excess": 0.03534054756164551,
+          "z": -2.0758442878723145
+        },
+        {
+          "morpheme": "-il",
+          "n_pairs": 6,
+          "observed_L": 0.5444492101669312,
+          "observed_consistency": 0.45555078983306885,
+          "null_L": 0.6085349321365356,
+          "excess": 0.06408572196960449,
+          "z": -2.0297701358795166
+        },
+        {
+          "morpheme": "sup-",
+          "n_pairs": 5,
+          "observed_L": 0.5034027099609375,
+          "observed_consistency": 0.4965972900390625,
+          "null_L": 0.5754982829093933,
+          "excess": 0.07209557294845581,
+          "z": -1.9690238237380981
+        },
+        {
+          "morpheme": "-ory",
+          "n_pairs": 8,
+          "observed_L": 0.6029465794563293,
+          "observed_consistency": 0.39705342054367065,
+          "null_L": 0.658284068107605,
+          "excess": 0.055337488651275635,
+          "z": -1.9214563369750977
+        },
+        {
+          "morpheme": "-less",
+          "n_pairs": 5,
+          "observed_L": 0.5090508460998535,
+          "observed_consistency": 0.4909491539001465,
+          "null_L": 0.5780383348464966,
+          "excess": 0.06898748874664307,
+          "z": -1.8700237274169922
+        },
+        {
+          "morpheme": "-ose",
+          "n_pairs": 12,
+          "observed_L": 0.6686633229255676,
+          "observed_consistency": 0.3313366770744324,
+          "null_L": 0.7115795612335205,
+          "excess": 0.04291623830795288,
+          "z": -1.8634281158447266
+        },
+        {
+          "morpheme": "ad-",
+          "n_pairs": 7,
+          "observed_L": 0.5831009745597839,
+          "observed_consistency": 0.41689902544021606,
+          "null_L": 0.6379011273384094,
+          "excess": 0.05480015277862549,
+          "z": -1.8475182056427002
+        },
+        {
+          "morpheme": "-ier",
+          "n_pairs": 8,
+          "observed_L": 0.6038742661476135,
+          "observed_consistency": 0.3961257338523865,
+          "null_L": 0.6569522023200989,
+          "excess": 0.05307793617248535,
+          "z": -1.8075271844863892
+        },
+        {
+          "morpheme": "be-",
+          "n_pairs": 39,
+          "observed_L": 0.781195342540741,
+          "observed_consistency": 0.21880465745925903,
+          "null_L": 0.8072385191917419,
+          "excess": 0.026043176651000977,
+          "z": -1.7628759145736694
+        },
+        {
+          "morpheme": "-pen",
+          "n_pairs": 6,
+          "observed_L": 0.554740846157074,
+          "observed_consistency": 0.445259153842926,
+          "null_L": 0.6125676035881042,
+          "excess": 0.05782675743103027,
+          "z": -1.744616985321045
+        },
+        {
+          "morpheme": "dis-",
+          "n_pairs": 7,
+          "observed_L": 0.5862480401992798,
+          "observed_consistency": 0.4137519598007202,
+          "null_L": 0.6409494876861572,
+          "excess": 0.05470144748687744,
+          "z": -1.740715742111206
+        },
+        {
+          "morpheme": "out-",
+          "n_pairs": 4,
+          "observed_L": 0.4644094705581665,
+          "observed_consistency": 0.5355905294418335,
+          "null_L": 0.5313658714294434,
+          "excess": 0.06695640087127686,
+          "z": -1.593003511428833
+        },
+        {
+          "morpheme": "-eth",
+          "n_pairs": 5,
+          "observed_L": 0.5215165019035339,
+          "observed_consistency": 0.47848349809646606,
+          "null_L": 0.5777559876441956,
+          "excess": 0.05623948574066162,
+          "z": -1.5862197875976562
+        },
+        {
+          "morpheme": "-ics",
+          "n_pairs": 6,
+          "observed_L": 0.559421181678772,
+          "observed_consistency": 0.440578818321228,
+          "null_L": 0.611083984375,
+          "excess": 0.05166280269622803,
+          "z": -1.5675157308578491
+        },
+        {
+          "morpheme": "pur-",
+          "n_pairs": 6,
+          "observed_L": 0.5630658864974976,
+          "observed_consistency": 0.43693411350250244,
+          "null_L": 0.6131505370140076,
+          "excess": 0.05008465051651001,
+          "z": -1.5533552169799805
+        },
+        {
+          "morpheme": "hol-",
+          "n_pairs": 5,
+          "observed_L": 0.520928680896759,
+          "observed_consistency": 0.47907131910324097,
+          "null_L": 0.5768758654594421,
+          "excess": 0.055947184562683105,
+          "z": -1.5436921119689941
+        },
+        {
+          "morpheme": "-ess",
+          "n_pairs": 38,
+          "observed_L": 0.7828495502471924,
+          "observed_consistency": 0.21715044975280762,
+          "null_L": 0.8060364723205566,
+          "excess": 0.023186922073364258,
+          "z": -1.5292638540267944
+        },
+        {
+          "morpheme": "-x",
+          "n_pairs": 8,
+          "observed_L": 0.6161527633666992,
+          "observed_consistency": 0.3838472366333008,
+          "null_L": 0.6577373743057251,
+          "excess": 0.04158461093902588,
+          "z": -1.506962537765503
+        },
+        {
+          "morpheme": "super-",
+          "n_pairs": 3,
+          "observed_L": 0.3873645067214966,
+          "observed_consistency": 0.6126354932785034,
+          "null_L": 0.4603729844093323,
+          "excess": 0.0730084776878357,
+          "z": -1.4534661769866943
+        },
+        {
+          "morpheme": "em-",
+          "n_pairs": 10,
+          "observed_L": 0.6548473834991455,
+          "observed_consistency": 0.3451526165008545,
+          "null_L": 0.6904308795928955,
+          "excess": 0.03558349609375,
+          "z": -1.453108310699463
+        },
+        {
+          "morpheme": "-ile",
+          "n_pairs": 3,
+          "observed_L": 0.384374737739563,
+          "observed_consistency": 0.615625262260437,
+          "null_L": 0.4575597047805786,
+          "excess": 0.07318496704101562,
+          "z": -1.4311507940292358
+        },
+        {
+          "morpheme": "-gon",
+          "n_pairs": 4,
+          "observed_L": 0.46980345249176025,
+          "observed_consistency": 0.5301965475082397,
+          "null_L": 0.5297022461891174,
+          "excess": 0.05989879369735718,
+          "z": -1.426285982131958
+        },
+        {
+          "morpheme": "all-",
+          "n_pairs": 12,
+          "observed_L": 0.6767935752868652,
+          "observed_consistency": 0.32320642471313477,
+          "null_L": 0.7111790776252747,
+          "excess": 0.034385502338409424,
+          "z": -1.4161453247070312
+        },
+        {
+          "morpheme": "-mer",
+          "n_pairs": 3,
+          "observed_L": 0.3947738707065582,
+          "observed_consistency": 0.6052261590957642,
+          "null_L": 0.4610025882720947,
+          "excess": 0.0662287175655365,
+          "z": -1.353248953819275
+        },
+        {
+          "morpheme": "self-",
+          "n_pairs": 3,
+          "observed_L": 0.3982250690460205,
+          "observed_consistency": 0.6017749309539795,
+          "null_L": 0.4602515995502472,
+          "excess": 0.062026530504226685,
+          "z": -1.3520476818084717
+        },
+        {
+          "morpheme": "-ette",
+          "n_pairs": 4,
+          "observed_L": 0.47420692443847656,
+          "observed_consistency": 0.5257930755615234,
+          "null_L": 0.5289111137390137,
+          "excess": 0.05470418930053711,
+          "z": -1.305704951286316
+        },
+        {
+          "morpheme": "-ice",
+          "n_pairs": 5,
+          "observed_L": 0.533421516418457,
+          "observed_consistency": 0.46657848358154297,
+          "null_L": 0.5787422060966492,
+          "excess": 0.04532068967819214,
+          "z": -1.262019157409668
+        },
+        {
+          "morpheme": "-ane",
+          "n_pairs": 4,
+          "observed_L": 0.4767345190048218,
+          "observed_consistency": 0.5232654809951782,
+          "null_L": 0.5281976461410522,
+          "excess": 0.05146312713623047,
+          "z": -1.2353315353393555
+        },
+        {
+          "morpheme": "-ate",
+          "n_pairs": 14,
+          "observed_L": 0.7022323608398438,
+          "observed_consistency": 0.29776763916015625,
+          "null_L": 0.7279253005981445,
+          "excess": 0.02569293975830078,
+          "z": -1.2292590141296387
+        },
+        {
+          "morpheme": "-ous",
+          "n_pairs": 33,
+          "observed_L": 0.7814030647277832,
+          "observed_consistency": 0.2185969352722168,
+          "null_L": 0.7992253303527832,
+          "excess": 0.017822265625,
+          "z": -1.1821329593658447
+        },
+        {
+          "morpheme": "ob-",
+          "n_pairs": 7,
+          "observed_L": 0.6001454591751099,
+          "observed_consistency": 0.39985454082489014,
+          "null_L": 0.6371996402740479,
+          "excess": 0.03705418109893799,
+          "z": -1.1622169017791748
+        },
+        {
+          "morpheme": "-some",
+          "n_pairs": 5,
+          "observed_L": 0.531243085861206,
+          "observed_consistency": 0.46875691413879395,
+          "null_L": 0.5751003623008728,
+          "excess": 0.04385727643966675,
+          "z": -1.1611863374710083
+        },
+        {
+          "morpheme": "dif-",
+          "n_pairs": 4,
+          "observed_L": 0.48185133934020996,
+          "observed_consistency": 0.51814866065979,
+          "null_L": 0.531102180480957,
+          "excess": 0.04925084114074707,
+          "z": -1.144811987876892
+        },
+        {
+          "morpheme": "-est",
+          "n_pairs": 8,
+          "observed_L": 0.6249276399612427,
+          "observed_consistency": 0.3750723600387573,
+          "null_L": 0.6568338871002197,
+          "excess": 0.03190624713897705,
+          "z": -1.0973494052886963
+        },
+        {
+          "morpheme": "-ine",
+          "n_pairs": 8,
+          "observed_L": 0.627388596534729,
+          "observed_consistency": 0.372611403465271,
+          "null_L": 0.6581260561943054,
+          "excess": 0.030737459659576416,
+          "z": -1.0869710445404053
+        },
+        {
+          "morpheme": "-most",
+          "n_pairs": 6,
+          "observed_L": 0.5753498673439026,
+          "observed_consistency": 0.4246501326560974,
+          "null_L": 0.6107524633407593,
+          "excess": 0.03540259599685669,
+          "z": -1.0296274423599243
+        },
+        {
+          "morpheme": "for-",
+          "n_pairs": 3,
+          "observed_L": 0.4082683026790619,
+          "observed_consistency": 0.5917316675186157,
+          "null_L": 0.45777615904808044,
+          "excess": 0.049507856369018555,
+          "z": -1.0211280584335327
+        },
+        {
+          "morpheme": "met-",
+          "n_pairs": 3,
+          "observed_L": 0.4111131429672241,
+          "observed_consistency": 0.5888868570327759,
+          "null_L": 0.45901861786842346,
+          "excess": 0.04790547490119934,
+          "z": -0.9919986128807068
+        },
+        {
+          "morpheme": "-ity",
+          "n_pairs": 13,
+          "observed_L": 0.6966747641563416,
+          "observed_consistency": 0.30332523584365845,
+          "null_L": 0.7190462350845337,
+          "excess": 0.02237147092819214,
+          "z": -0.9634600877761841
+        },
+        {
+          "morpheme": "-gen",
+          "n_pairs": 3,
+          "observed_L": 0.41022300720214844,
+          "observed_consistency": 0.5897769927978516,
+          "null_L": 0.4565269649028778,
+          "excess": 0.04630395770072937,
+          "z": -0.9630310535430908
+        },
+        {
+          "morpheme": "-el",
+          "n_pairs": 8,
+          "observed_L": 0.6305439472198486,
+          "observed_consistency": 0.36945605278015137,
+          "null_L": 0.6576141715049744,
+          "excess": 0.027070224285125732,
+          "z": -0.9558402299880981
+        },
+        {
+          "morpheme": "uni-",
+          "n_pairs": 4,
+          "observed_L": 0.4902394711971283,
+          "observed_consistency": 0.5097604990005493,
+          "null_L": 0.5299765467643738,
+          "excess": 0.03973707556724548,
+          "z": -0.9461203813552856
+        },
+        {
+          "morpheme": "pro-",
+          "n_pairs": 17,
+          "observed_L": 0.7290938496589661,
+          "observed_consistency": 0.27090615034103394,
+          "null_L": 0.7478205561637878,
+          "excess": 0.018726706504821777,
+          "z": -0.9231429100036621
+        },
+        {
+          "morpheme": "-ol",
+          "n_pairs": 3,
+          "observed_L": 0.41147053241729736,
+          "observed_consistency": 0.5885294675827026,
+          "null_L": 0.45968931913375854,
+          "excess": 0.04821878671646118,
+          "z": -0.9175591468811035
+        },
+        {
+          "morpheme": "-ery",
+          "n_pairs": 13,
+          "observed_L": 0.7026128768920898,
+          "observed_consistency": 0.29738712310791016,
+          "null_L": 0.7211831212043762,
+          "excess": 0.018570244312286377,
+          "z": -0.8592166900634766
+        },
+        {
+          "morpheme": "de-",
+          "n_pairs": 33,
+          "observed_L": 0.7862409353256226,
+          "observed_consistency": 0.21375906467437744,
+          "null_L": 0.7989062070846558,
+          "excess": 0.012665271759033203,
+          "z": -0.840729832649231
+        },
+        {
+          "morpheme": "-ist",
+          "n_pairs": 9,
+          "observed_L": 0.6521807312965393,
+          "observed_consistency": 0.3478192687034607,
+          "null_L": 0.6748744249343872,
+          "excess": 0.0226936936378479,
+          "z": -0.8203117847442627
+        },
+        {
+          "morpheme": "ab-",
+          "n_pairs": 3,
+          "observed_L": 0.41826844215393066,
+          "observed_consistency": 0.5817315578460693,
+          "null_L": 0.45615044236183167,
+          "excess": 0.037882000207901,
+          "z": -0.8104908466339111
+        },
+        {
+          "morpheme": "-ule",
+          "n_pairs": 3,
+          "observed_L": 0.42202362418174744,
+          "observed_consistency": 0.5779763460159302,
+          "null_L": 0.4631929099559784,
+          "excess": 0.04116928577423096,
+          "z": -0.8058802485466003
+        },
+        {
+          "morpheme": "-ock",
+          "n_pairs": 3,
+          "observed_L": 0.42014995217323303,
+          "observed_consistency": 0.5798500776290894,
+          "null_L": 0.45776665210723877,
+          "excess": 0.03761669993400574,
+          "z": -0.7780938744544983
+        },
+        {
+          "morpheme": "-gate",
+          "n_pairs": 4,
+          "observed_L": 0.4960845410823822,
+          "observed_consistency": 0.5039154291152954,
+          "null_L": 0.5276029109954834,
+          "excess": 0.031518369913101196,
+          "z": -0.7509469389915466
+        },
+        {
+          "morpheme": "col-",
+          "n_pairs": 11,
+          "observed_L": 0.6839348673820496,
+          "observed_consistency": 0.31606513261795044,
+          "null_L": 0.7016903162002563,
+          "excess": 0.017755448818206787,
+          "z": -0.7143285870552063
+        },
+        {
+          "morpheme": "-ness",
+          "n_pairs": 22,
+          "observed_L": 0.7580109238624573,
+          "observed_consistency": 0.24198907613754272,
+          "null_L": 0.7714277505874634,
+          "excess": 0.013416826725006104,
+          "z": -0.6980498433113098
+        },
+        {
+          "morpheme": "-ual",
+          "n_pairs": 3,
+          "observed_L": 0.4236045777797699,
+          "observed_consistency": 0.5763953924179077,
+          "null_L": 0.4569876790046692,
+          "excess": 0.03338310122489929,
+          "z": -0.6965745687484741
+        },
+        {
+          "morpheme": "con-",
+          "n_pairs": 30,
+          "observed_L": 0.7818352580070496,
+          "observed_consistency": 0.21816474199295044,
+          "null_L": 0.7926528453826904,
+          "excess": 0.01081758737564087,
+          "z": -0.6850736141204834
+        },
+        {
+          "morpheme": "-or",
+          "n_pairs": 15,
+          "observed_L": 0.7230469584465027,
+          "observed_consistency": 0.2769530415534973,
+          "null_L": 0.7374065518379211,
+          "excess": 0.014359593391418457,
+          "z": -0.67425137758255
+        },
+        {
+          "morpheme": "per-",
+          "n_pairs": 10,
+          "observed_L": 0.6717435717582703,
+          "observed_consistency": 0.32825642824172974,
+          "null_L": 0.6883742213249207,
+          "excess": 0.01663064956665039,
+          "z": -0.6648545861244202
+        },
+        {
+          "morpheme": "par-",
+          "n_pairs": 5,
+          "observed_L": 0.5526198148727417,
+          "observed_consistency": 0.4473801851272583,
+          "null_L": 0.5775830149650574,
+          "excess": 0.024963200092315674,
+          "z": -0.6482039093971252
+        },
+        {
+          "morpheme": "an-",
+          "n_pairs": 10,
+          "observed_L": 0.6722437739372253,
+          "observed_consistency": 0.32775622606277466,
+          "null_L": 0.6889011263847351,
+          "excess": 0.016657352447509766,
+          "z": -0.6207278370857239
+        },
+        {
+          "morpheme": "ex-",
+          "n_pairs": 28,
+          "observed_L": 0.7782502770423889,
+          "observed_consistency": 0.22174972295761108,
+          "null_L": 0.7887471914291382,
+          "excess": 0.010496914386749268,
+          "z": -0.6163552403450012
+        },
+        {
+          "morpheme": "meth-",
+          "n_pairs": 3,
+          "observed_L": 0.42687931656837463,
+          "observed_consistency": 0.5731207132339478,
+          "null_L": 0.4540626108646393,
+          "excess": 0.02718329429626465,
+          "z": -0.5815126299858093
+        },
+        {
+          "morpheme": "-ative",
+          "n_pairs": 3,
+          "observed_L": 0.4278123676776886,
+          "observed_consistency": 0.5721876621246338,
+          "null_L": 0.4577193558216095,
+          "excess": 0.0299069881439209,
+          "z": -0.5779714584350586
+        },
+        {
+          "morpheme": "-ped",
+          "n_pairs": 13,
+          "observed_L": 0.7090514898300171,
+          "observed_consistency": 0.2909485101699829,
+          "null_L": 0.7208393216133118,
+          "excess": 0.011787831783294678,
+          "z": -0.5309461951255798
+        },
+        {
+          "morpheme": "-end",
+          "n_pairs": 6,
+          "observed_L": 0.5954529047012329,
+          "observed_consistency": 0.4045470952987671,
+          "null_L": 0.6118659377098083,
+          "excess": 0.01641303300857544,
+          "z": -0.5039682388305664
+        },
+        {
+          "morpheme": "-ism",
+          "n_pairs": 12,
+          "observed_L": 0.7001535296440125,
+          "observed_consistency": 0.29984647035598755,
+          "null_L": 0.711329460144043,
+          "excess": 0.011175930500030518,
+          "z": -0.48702430725097656
+        },
+        {
+          "morpheme": "-ic",
+          "n_pairs": 10,
+          "observed_L": 0.6788472533226013,
+          "observed_consistency": 0.3211527466773987,
+          "null_L": 0.6895143985748291,
+          "excess": 0.010667145252227783,
+          "z": -0.4567866623401642
+        },
+        {
+          "morpheme": "-ard",
+          "n_pairs": 3,
+          "observed_L": 0.43492400646209717,
+          "observed_consistency": 0.5650759935379028,
+          "null_L": 0.454432874917984,
+          "excess": 0.01950886845588684,
+          "z": -0.4061679244041443
+        },
+        {
+          "morpheme": "-in",
+          "n_pairs": 15,
+          "observed_L": 0.728733241558075,
+          "observed_consistency": 0.27126675844192505,
+          "null_L": 0.7370096445083618,
+          "excess": 0.008276402950286865,
+          "z": -0.4035746157169342
+        },
+        {
+          "morpheme": "-al",
+          "n_pairs": 29,
+          "observed_L": 0.78522127866745,
+          "observed_consistency": 0.21477872133255005,
+          "null_L": 0.7914859652519226,
+          "excess": 0.006264686584472656,
+          "z": -0.3803032338619232
+        },
+        {
+          "morpheme": "-ite",
+          "n_pairs": 4,
+          "observed_L": 0.5185134410858154,
+          "observed_consistency": 0.48148655891418457,
+          "null_L": 0.5316834449768066,
+          "excess": 0.013170003890991211,
+          "z": -0.324627548456192
+        },
+        {
+          "morpheme": "-s'",
+          "n_pairs": 5,
+          "observed_L": 0.5664618611335754,
+          "observed_consistency": 0.43353813886642456,
+          "null_L": 0.5773258805274963,
+          "excess": 0.010864019393920898,
+          "z": -0.2968538701534271
+        },
+        {
+          "morpheme": "-ade",
+          "n_pairs": 5,
+          "observed_L": 0.5650259256362915,
+          "observed_consistency": 0.4349740743637085,
+          "null_L": 0.5755535960197449,
+          "excess": 0.01052767038345337,
+          "z": -0.2855355441570282
+        },
+        {
+          "morpheme": "mid-",
+          "n_pairs": 4,
+          "observed_L": 0.5180106163024902,
+          "observed_consistency": 0.48198938369750977,
+          "null_L": 0.5297082662582397,
+          "excess": 0.011697649955749512,
+          "z": -0.2744876444339752
+        },
+        {
+          "morpheme": "-ian",
+          "n_pairs": 5,
+          "observed_L": 0.5664523243904114,
+          "observed_consistency": 0.4335476756095886,
+          "null_L": 0.5765145421028137,
+          "excess": 0.010062217712402344,
+          "z": -0.26700472831726074
+        },
+        {
+          "morpheme": "-ling",
+          "n_pairs": 12,
+          "observed_L": 0.705356776714325,
+          "observed_consistency": 0.29464322328567505,
+          "null_L": 0.7113436460494995,
+          "excess": 0.0059868693351745605,
+          "z": -0.24411557614803314
+        },
+        {
+          "morpheme": "-ible",
+          "n_pairs": 5,
+          "observed_L": 0.5687708258628845,
+          "observed_consistency": 0.4312291741371155,
+          "null_L": 0.577980101108551,
+          "excess": 0.009209275245666504,
+          "z": -0.24187275767326355
+        },
+        {
+          "morpheme": "-ster",
+          "n_pairs": 6,
+          "observed_L": 0.6015093922615051,
+          "observed_consistency": 0.3984906077384949,
+          "null_L": 0.6085140109062195,
+          "excess": 0.0070046186447143555,
+          "z": -0.22479383647441864
+        },
+        {
+          "morpheme": "-ant",
+          "n_pairs": 8,
+          "observed_L": 0.651613712310791,
+          "observed_consistency": 0.348386287689209,
+          "null_L": 0.6581132411956787,
+          "excess": 0.006499528884887695,
+          "z": -0.22034554183483124
+        },
+        {
+          "morpheme": "en-",
+          "n_pairs": 17,
+          "observed_L": 0.744625449180603,
+          "observed_consistency": 0.255374550819397,
+          "null_L": 0.7488943338394165,
+          "excess": 0.0042688846588134766,
+          "z": -0.20405423641204834
+        },
+        {
+          "morpheme": "prop-",
+          "n_pairs": 4,
+          "observed_L": 0.525199830532074,
+          "observed_consistency": 0.474800169467926,
+          "null_L": 0.5322597622871399,
+          "excess": 0.007059931755065918,
+          "z": -0.16567908227443695
+        },
+        {
+          "morpheme": "mon-",
+          "n_pairs": 4,
+          "observed_L": 0.5220119953155518,
+          "observed_consistency": 0.47798800468444824,
+          "null_L": 0.5286886096000671,
+          "excess": 0.006676614284515381,
+          "z": -0.15497924387454987
+        },
+        {
+          "morpheme": "-im",
+          "n_pairs": 7,
+          "observed_L": 0.6321524381637573,
+          "observed_consistency": 0.3678475618362427,
+          "null_L": 0.6369980573654175,
+          "excess": 0.004845619201660156,
+          "z": -0.1487165093421936
+        },
+        {
+          "morpheme": "re-",
+          "n_pairs": 50,
+          "observed_L": 0.8193017840385437,
+          "observed_consistency": 0.1806982159614563,
+          "null_L": 0.8211728930473328,
+          "excess": 0.0018711090087890625,
+          "z": -0.1416214555501938
+        },
+        {
+          "morpheme": "-ome",
+          "n_pairs": 11,
+          "observed_L": 0.698422372341156,
+          "observed_consistency": 0.301577627658844,
+          "null_L": 0.7015566825866699,
+          "excess": 0.003134310245513916,
+          "z": -0.128365620970726
+        },
+        {
+          "morpheme": "-our",
+          "n_pairs": 8,
+          "observed_L": 0.6590243577957153,
+          "observed_consistency": 0.34097564220428467,
+          "null_L": 0.6591405272483826,
+          "excess": 0.00011616945266723633,
+          "z": -0.004063913132995367
+        },
+        {
+          "morpheme": "op-",
+          "n_pairs": 4,
+          "observed_L": 0.5344871878623962,
+          "observed_consistency": 0.46551281213760376,
+          "null_L": 0.5290235280990601,
+          "excess": -0.005463659763336182,
+          "z": 0.13638874888420105
+        },
+        {
+          "morpheme": "pre-",
+          "n_pairs": 9,
+          "observed_L": 0.6771500110626221,
+          "observed_consistency": 0.32284998893737793,
+          "null_L": 0.6732689142227173,
+          "excess": -0.003881096839904785,
+          "z": 0.1451115906238556
+        },
+        {
+          "morpheme": "under-",
+          "n_pairs": 5,
+          "observed_L": 0.5854209065437317,
+          "observed_consistency": 0.4145790934562683,
+          "null_L": 0.5795120000839233,
+          "excess": -0.00590890645980835,
+          "z": 0.1621742695569992
+        },
+        {
+          "morpheme": "-id",
+          "n_pairs": 5,
+          "observed_L": 0.5858494639396667,
+          "observed_consistency": 0.41415053606033325,
+          "null_L": 0.578865110874176,
+          "excess": -0.006984353065490723,
+          "z": 0.1809520572423935
+        },
+        {
+          "morpheme": "-able",
+          "n_pairs": 8,
+          "observed_L": 0.6622428894042969,
+          "observed_consistency": 0.3377571105957031,
+          "null_L": 0.6569660902023315,
+          "excess": -0.005276799201965332,
+          "z": 0.18131877481937408
+        },
+        {
+          "morpheme": "-one",
+          "n_pairs": 5,
+          "observed_L": 0.585516631603241,
+          "observed_consistency": 0.41448336839675903,
+          "null_L": 0.5778371691703796,
+          "excess": -0.007679462432861328,
+          "z": 0.21766795217990875
+        },
+        {
+          "morpheme": "-ial",
+          "n_pairs": 4,
+          "observed_L": 0.5409737825393677,
+          "observed_consistency": 0.4590262174606323,
+          "null_L": 0.5303105711936951,
+          "excess": -0.010663211345672607,
+          "z": 0.26728469133377075
+        },
+        {
+          "morpheme": "up-",
+          "n_pairs": 3,
+          "observed_L": 0.47418883442878723,
+          "observed_consistency": 0.5258111953735352,
+          "null_L": 0.46042799949645996,
+          "excess": -0.01376083493232727,
+          "z": 0.2718258798122406
+        },
+        {
+          "morpheme": "sub-",
+          "n_pairs": 5,
+          "observed_L": 0.589570164680481,
+          "observed_consistency": 0.41042983531951904,
+          "null_L": 0.5787991285324097,
+          "excess": -0.010771036148071289,
+          "z": 0.2999087870121002
+        },
+        {
+          "morpheme": "in-",
+          "n_pairs": 35,
+          "observed_L": 0.8076820969581604,
+          "observed_consistency": 0.1923179030418396,
+          "null_L": 0.8010772466659546,
+          "excess": -0.0066048502922058105,
+          "z": 0.4295066297054291
+        },
+        {
+          "morpheme": "-ence",
+          "n_pairs": 9,
+          "observed_L": 0.6878828406333923,
+          "observed_consistency": 0.31211715936660767,
+          "null_L": 0.6741656064987183,
+          "excess": -0.013717234134674072,
+          "z": 0.5171841979026794
+        },
+        {
+          "morpheme": "sur-",
+          "n_pairs": 4,
+          "observed_L": 0.5553189516067505,
+          "observed_consistency": 0.4446810483932495,
+          "null_L": 0.5324884653091431,
+          "excess": -0.022830486297607422,
+          "z": 0.5496639013290405
+        },
+        {
+          "morpheme": "-een",
+          "n_pairs": 4,
+          "observed_L": 0.5528451204299927,
+          "observed_consistency": 0.4471548795700073,
+          "null_L": 0.5275649428367615,
+          "excess": -0.0252801775932312,
+          "z": 0.617434561252594
+        },
+        {
+          "morpheme": "over-",
+          "n_pairs": 7,
+          "observed_L": 0.6591745615005493,
+          "observed_consistency": 0.3408254384994507,
+          "null_L": 0.6379554867744446,
+          "excess": -0.021219074726104736,
+          "z": 0.7058392763137817
+        },
+        {
+          "morpheme": "-ise",
+          "n_pairs": 7,
+          "observed_L": 0.6616848707199097,
+          "observed_consistency": 0.33831512928009033,
+          "null_L": 0.6391375064849854,
+          "excess": -0.022547364234924316,
+          "z": 0.7400504946708679
+        },
+        {
+          "morpheme": "-le",
+          "n_pairs": 28,
+          "observed_L": 0.8034292459487915,
+          "observed_consistency": 0.1965707540512085,
+          "null_L": 0.7886148691177368,
+          "excess": -0.014814376831054688,
+          "z": 0.9061282873153687
+        },
+        {
+          "morpheme": "cor-",
+          "n_pairs": 3,
+          "observed_L": 0.5081035494804382,
+          "observed_consistency": 0.49189645051956177,
+          "null_L": 0.4576125741004944,
+          "excess": -0.05049097537994385,
+          "z": 1.0344460010528564
+        },
+        {
+          "morpheme": "un-",
+          "n_pairs": 21,
+          "observed_L": 0.7869685292243958,
+          "observed_consistency": 0.21303147077560425,
+          "null_L": 0.7662038803100586,
+          "excess": -0.020764648914337158,
+          "z": 1.1380590200424194
+        },
+        {
+          "morpheme": "-ment",
+          "n_pairs": 15,
+          "observed_L": 0.7593204379081726,
+          "observed_consistency": 0.2406795620918274,
+          "null_L": 0.7352560758590698,
+          "excess": -0.024064362049102783,
+          "z": 1.148232102394104
+        },
+        {
+          "morpheme": "-en",
+          "n_pairs": 27,
+          "observed_L": 0.8147381544113159,
+          "observed_consistency": 0.18526184558868408,
+          "null_L": 0.7852405905723572,
+          "excess": -0.02949756383895874,
+          "z": 1.7820974588394165
+        }
+      ]
+    },
+    "permutation_post": {
+      "label": "POST (after P3)",
+      "n_pairs": 1413,
+      "n_groups": 130,
+      "n_perm": 500,
+      "observed_L_morph": 0.5811048150062561,
+      "observed_consistency": 0.4188951849937439,
+      "null_mean": 0.6976397037506104,
+      "null_sd": 0.0009539324673824012,
+      "excess_over_chance": 0.11653488874435425,
+      "z": -122.1626191884704,
+      "n_groups_below_z3": 60,
+      "pairs_below_z3": 900,
+      "per_group": [
+        {
+          "morpheme": "-ion",
+          "n_pairs": 69,
+          "observed_L": 0.5179519653320312,
+          "observed_consistency": 0.48204803466796875,
+          "null_L": 0.8044592142105103,
+          "excess": 0.286507248878479,
+          "z": -19.719594955444336
+        },
+        {
+          "morpheme": "-ation",
+          "n_pairs": 37,
+          "observed_L": 0.4751104414463043,
+          "observed_consistency": 0.5248895883560181,
+          "null_L": 0.7814573049545288,
+          "excess": 0.3063468635082245,
+          "z": -16.220809936523438
+        },
+        {
+          "morpheme": "-ition",
+          "n_pairs": 5,
+          "observed_L": 0.21732649207115173,
+          "observed_consistency": 0.7826734781265259,
+          "null_L": 0.5678549408912659,
+          "excess": 0.35052844882011414,
+          "z": -8.50893783569336
+        },
+        {
+          "morpheme": "-ure",
+          "n_pairs": 10,
+          "observed_L": 0.4246753752231598,
+          "observed_consistency": 0.5753246545791626,
+          "null_L": 0.6729929447174072,
+          "excess": 0.24831756949424744,
+          "z": -8.113627433776855
+        },
+        {
+          "morpheme": "-fication",
+          "n_pairs": 3,
+          "observed_L": 0.017046809196472168,
+          "observed_consistency": 0.9829531908035278,
+          "null_L": 0.4526115953922272,
+          "excess": 0.435564786195755,
+          "z": -8.098958015441895
+        },
+        {
+          "morpheme": "-ive",
+          "n_pairs": 18,
+          "observed_L": 0.5340413451194763,
+          "observed_consistency": 0.4659586548805237,
+          "null_L": 0.7329515218734741,
+          "excess": 0.1989101767539978,
+          "z": -8.055435180664062
+        },
+        {
+          "morpheme": "mis-",
+          "n_pairs": 13,
+          "observed_L": 0.5099676847457886,
+          "observed_consistency": 0.4900323152542114,
+          "null_L": 0.7051402926445007,
+          "excess": 0.19517260789871216,
+          "z": -7.631420135498047
+        },
+        {
+          "morpheme": "-ess",
+          "n_pairs": 38,
+          "observed_L": 0.6465485692024231,
+          "observed_consistency": 0.3534514307975769,
+          "null_L": 0.7808220982551575,
+          "excess": 0.13427352905273438,
+          "z": -7.173503875732422
+        },
+        {
+          "morpheme": "-x",
+          "n_pairs": 8,
+          "observed_L": 0.4192814230918884,
+          "observed_consistency": 0.5807185769081116,
+          "null_L": 0.6448997259140015,
+          "excess": 0.22561830282211304,
+          "z": -6.887284755706787
+        },
+        {
+          "morpheme": "-ory",
+          "n_pairs": 8,
+          "observed_L": 0.42987728118896484,
+          "observed_consistency": 0.5701227188110352,
+          "null_L": 0.6448871493339539,
+          "excess": 0.215009868144989,
+          "z": -6.470843315124512
+        },
+        {
+          "morpheme": "-sy",
+          "n_pairs": 9,
+          "observed_L": 0.44797569513320923,
+          "observed_consistency": 0.5520243048667908,
+          "null_L": 0.6627140641212463,
+          "excess": 0.2147383689880371,
+          "z": -6.462015151977539
+        },
+        {
+          "morpheme": "em-",
+          "n_pairs": 10,
+          "observed_L": 0.4904000163078308,
+          "observed_consistency": 0.5095999836921692,
+          "null_L": 0.676025390625,
+          "excess": 0.1856253743171692,
+          "z": -6.364166259765625
+        },
+        {
+          "morpheme": "-ious",
+          "n_pairs": 10,
+          "observed_L": 0.4779018759727478,
+          "observed_consistency": 0.5220981240272522,
+          "null_L": 0.6729817390441895,
+          "excess": 0.19507986307144165,
+          "z": -6.290241718292236
+        },
+        {
+          "morpheme": "suc-",
+          "n_pairs": 8,
+          "observed_L": 0.4383682906627655,
+          "observed_consistency": 0.5616316795349121,
+          "null_L": 0.643398106098175,
+          "excess": 0.20502981543540955,
+          "z": -6.229117393493652
+        },
+        {
+          "morpheme": "re-",
+          "n_pairs": 50,
+          "observed_L": 0.696807324886322,
+          "observed_consistency": 0.303192675113678,
+          "null_L": 0.7948015332221985,
+          "excess": 0.09799420833587646,
+          "z": -6.01652717590332
+        },
+        {
+          "morpheme": "di-",
+          "n_pairs": 27,
+          "observed_L": 0.6343753337860107,
+          "observed_consistency": 0.36562466621398926,
+          "null_L": 0.7642977237701416,
+          "excess": 0.12992238998413086,
+          "z": -5.962954044342041
+        },
+        {
+          "morpheme": "bi-",
+          "n_pairs": 15,
+          "observed_L": 0.5551987290382385,
+          "observed_consistency": 0.4448012709617615,
+          "null_L": 0.7191382050514221,
+          "excess": 0.1639394760131836,
+          "z": -5.886711597442627
+        },
+        {
+          "morpheme": "-ery",
+          "n_pairs": 13,
+          "observed_L": 0.5607155561447144,
+          "observed_consistency": 0.43928444385528564,
+          "null_L": 0.7042392492294312,
+          "excess": 0.1435236930847168,
+          "z": -5.527804374694824
+        },
+        {
+          "morpheme": "-ty",
+          "n_pairs": 27,
+          "observed_L": 0.6553435325622559,
+          "observed_consistency": 0.34465646743774414,
+          "null_L": 0.762955367565155,
+          "excess": 0.10761183500289917,
+          "z": -5.449747562408447
+        },
+        {
+          "morpheme": "com-",
+          "n_pairs": 26,
+          "observed_L": 0.6436105370521545,
+          "observed_consistency": 0.35638946294784546,
+          "null_L": 0.7600013017654419,
+          "excess": 0.11639076471328735,
+          "z": -5.4355878829956055
+        },
+        {
+          "morpheme": "-ar",
+          "n_pairs": 11,
+          "observed_L": 0.5326079726219177,
+          "observed_consistency": 0.4673920273780823,
+          "null_L": 0.6858246922492981,
+          "excess": 0.15321671962738037,
+          "z": -5.327469348907471
+        },
+        {
+          "morpheme": "-head",
+          "n_pairs": 3,
+          "observed_L": 0.17081265151500702,
+          "observed_consistency": 0.8291873335838318,
+          "null_L": 0.45088905096054077,
+          "excess": 0.28007638454437256,
+          "z": -5.297355651855469
+        },
+        {
+          "morpheme": "-ier",
+          "n_pairs": 8,
+          "observed_L": 0.46359583735466003,
+          "observed_consistency": 0.5364041328430176,
+          "null_L": 0.6432307362556458,
+          "excess": 0.17963489890098572,
+          "z": -5.2634992599487305
+        },
+        {
+          "morpheme": "sup-",
+          "n_pairs": 5,
+          "observed_L": 0.3525875210762024,
+          "observed_consistency": 0.6474124789237976,
+          "null_L": 0.5664443969726562,
+          "excess": 0.21385687589645386,
+          "z": -5.199749946594238
+        },
+        {
+          "morpheme": "be-",
+          "n_pairs": 39,
+          "observed_L": 0.6902397274971008,
+          "observed_consistency": 0.30976027250289917,
+          "null_L": 0.7820162177085876,
+          "excess": 0.09177649021148682,
+          "z": -5.089609146118164
+        },
+        {
+          "morpheme": "se-",
+          "n_pairs": 31,
+          "observed_L": 0.670819878578186,
+          "observed_consistency": 0.32918012142181396,
+          "null_L": 0.7718151807785034,
+          "excess": 0.10099530220031738,
+          "z": -5.019254207611084
+        },
+        {
+          "morpheme": "-less",
+          "n_pairs": 5,
+          "observed_L": 0.3634125292301178,
+          "observed_consistency": 0.6365875005722046,
+          "null_L": 0.5684887766838074,
+          "excess": 0.20507624745368958,
+          "z": -4.968810558319092
+        },
+        {
+          "morpheme": "-ness",
+          "n_pairs": 22,
+          "observed_L": 0.6384647488594055,
+          "observed_consistency": 0.3615352511405945,
+          "null_L": 0.7512136101722717,
+          "excess": 0.11274886131286621,
+          "z": -4.839045524597168
+        },
+        {
+          "morpheme": "-ous",
+          "n_pairs": 33,
+          "observed_L": 0.6855894327163696,
+          "observed_consistency": 0.31441056728363037,
+          "null_L": 0.7756136655807495,
+          "excess": 0.09002423286437988,
+          "z": -4.761242866516113
+        },
+        {
+          "morpheme": "dif-",
+          "n_pairs": 4,
+          "observed_L": 0.2988561689853668,
+          "observed_consistency": 0.7011438608169556,
+          "null_L": 0.522255003452301,
+          "excess": 0.2233988344669342,
+          "z": -4.714747905731201
+        },
+        {
+          "morpheme": "pur-",
+          "n_pairs": 6,
+          "observed_L": 0.43164849281311035,
+          "observed_consistency": 0.5683515071868896,
+          "null_L": 0.6027015447616577,
+          "excess": 0.17105305194854736,
+          "z": -4.684765338897705
+        },
+        {
+          "morpheme": "super-",
+          "n_pairs": 3,
+          "observed_L": 0.21119914948940277,
+          "observed_consistency": 0.788800835609436,
+          "null_L": 0.4547073543071747,
+          "excess": 0.2435082048177719,
+          "z": -4.574013710021973
+        },
+        {
+          "morpheme": "ex-",
+          "n_pairs": 28,
+          "observed_L": 0.6686848402023315,
+          "observed_consistency": 0.33131515979766846,
+          "null_L": 0.7657009363174438,
+          "excess": 0.0970160961151123,
+          "z": -4.49250602722168
+        },
+        {
+          "morpheme": "-ish",
+          "n_pairs": 11,
+          "observed_L": 0.5499870777130127,
+          "observed_consistency": 0.4500129222869873,
+          "null_L": 0.6853805780410767,
+          "excess": 0.13539350032806396,
+          "z": -4.458459377288818
+        },
+        {
+          "morpheme": "-ics",
+          "n_pairs": 6,
+          "observed_L": 0.4351760149002075,
+          "observed_consistency": 0.5648239850997925,
+          "null_L": 0.6004275679588318,
+          "excess": 0.16525155305862427,
+          "z": -4.378586769104004
+        },
+        {
+          "morpheme": "-ance",
+          "n_pairs": 5,
+          "observed_L": 0.3919237554073334,
+          "observed_consistency": 0.6080762147903442,
+          "null_L": 0.5672905445098877,
+          "excess": 0.17536678910255432,
+          "z": -4.295167446136475
+        },
+        {
+          "morpheme": "de-",
+          "n_pairs": 33,
+          "observed_L": 0.6942680478096008,
+          "observed_consistency": 0.30573195219039917,
+          "null_L": 0.7749271392822266,
+          "excess": 0.08065909147262573,
+          "z": -4.26739501953125
+        },
+        {
+          "morpheme": "-man",
+          "n_pairs": 10,
+          "observed_L": 0.5522675514221191,
+          "observed_consistency": 0.44773244857788086,
+          "null_L": 0.6770908236503601,
+          "excess": 0.12482327222824097,
+          "z": -4.193864345550537
+        },
+        {
+          "morpheme": "-ism",
+          "n_pairs": 12,
+          "observed_L": 0.5855966210365295,
+          "observed_consistency": 0.41440337896347046,
+          "null_L": 0.6953792572021484,
+          "excess": 0.1097826361656189,
+          "z": -4.061858177185059
+        },
+        {
+          "morpheme": "all-",
+          "n_pairs": 12,
+          "observed_L": 0.5783798098564148,
+          "observed_consistency": 0.4216201901435852,
+          "null_L": 0.6951236128807068,
+          "excess": 0.11674380302429199,
+          "z": -4.032439708709717
+        },
+        {
+          "morpheme": "-in",
+          "n_pairs": 15,
+          "observed_L": 0.6197870373725891,
+          "observed_consistency": 0.3802129626274109,
+          "null_L": 0.7187511920928955,
+          "excess": 0.0989641547203064,
+          "z": -3.970613718032837
+        },
+        {
+          "morpheme": "-ity",
+          "n_pairs": 13,
+          "observed_L": 0.5923423171043396,
+          "observed_consistency": 0.4076576828956604,
+          "null_L": 0.7020810842514038,
+          "excess": 0.10973876714706421,
+          "z": -3.904703140258789
+        },
+        {
+          "morpheme": "-gon",
+          "n_pairs": 4,
+          "observed_L": 0.345737099647522,
+          "observed_consistency": 0.654262900352478,
+          "null_L": 0.5221314430236816,
+          "excess": 0.17639434337615967,
+          "z": -3.8366291522979736
+        },
+        {
+          "morpheme": "-ped",
+          "n_pairs": 13,
+          "observed_L": 0.6045337915420532,
+          "observed_consistency": 0.3954662084579468,
+          "null_L": 0.7045416831970215,
+          "excess": 0.10000789165496826,
+          "z": -3.7430830001831055
+        },
+        {
+          "morpheme": "-le",
+          "n_pairs": 28,
+          "observed_L": 0.6921098828315735,
+          "observed_consistency": 0.3078901171684265,
+          "null_L": 0.7664954662322998,
+          "excess": 0.07438558340072632,
+          "z": -3.7263214588165283
+        },
+        {
+          "morpheme": "con-",
+          "n_pairs": 30,
+          "observed_L": 0.6963135600090027,
+          "observed_consistency": 0.3036864399909973,
+          "null_L": 0.7692943215370178,
+          "excess": 0.07298076152801514,
+          "z": -3.709630250930786
+        },
+        {
+          "morpheme": "hol-",
+          "n_pairs": 5,
+          "observed_L": 0.4156154990196228,
+          "observed_consistency": 0.5843845009803772,
+          "null_L": 0.5671666264533997,
+          "excess": 0.15155112743377686,
+          "z": -3.6940157413482666
+        },
+        {
+          "morpheme": "out-",
+          "n_pairs": 4,
+          "observed_L": 0.35750624537467957,
+          "observed_consistency": 0.642493724822998,
+          "null_L": 0.5231227278709412,
+          "excess": 0.1656164824962616,
+          "z": -3.562049150466919
+        },
+        {
+          "morpheme": "-th",
+          "n_pairs": 24,
+          "observed_L": 0.6783401370048523,
+          "observed_consistency": 0.3216598629951477,
+          "null_L": 0.7564159035682678,
+          "excess": 0.07807576656341553,
+          "z": -3.513414144515991
+        },
+        {
+          "morpheme": "-pen",
+          "n_pairs": 6,
+          "observed_L": 0.470363587141037,
+          "observed_consistency": 0.5296363830566406,
+          "null_L": 0.6019995808601379,
+          "excess": 0.13163599371910095,
+          "z": -3.5130057334899902
+        },
+        {
+          "morpheme": "dis-",
+          "n_pairs": 7,
+          "observed_L": 0.5045729279518127,
+          "observed_consistency": 0.49542707204818726,
+          "null_L": 0.6294348835945129,
+          "excess": 0.1248619556427002,
+          "z": -3.4980809688568115
+        },
+        {
+          "morpheme": "-il",
+          "n_pairs": 6,
+          "observed_L": 0.47468772530555725,
+          "observed_consistency": 0.5253123044967651,
+          "null_L": 0.5974228382110596,
+          "excess": 0.12273511290550232,
+          "z": -3.3733928203582764
+        },
+        {
+          "morpheme": "-eth",
+          "n_pairs": 5,
+          "observed_L": 0.43331822752952576,
+          "observed_consistency": 0.5666817426681519,
+          "null_L": 0.5674549341201782,
+          "excess": 0.13413670659065247,
+          "z": -3.324647903442383
+        },
+        {
+          "morpheme": "-ist",
+          "n_pairs": 9,
+          "observed_L": 0.5546529293060303,
+          "observed_consistency": 0.4453470706939697,
+          "null_L": 0.6609659194946289,
+          "excess": 0.10631299018859863,
+          "z": -3.297556161880493
+        },
+        {
+          "morpheme": "-mer",
+          "n_pairs": 3,
+          "observed_L": 0.28317371010780334,
+          "observed_consistency": 0.716826319694519,
+          "null_L": 0.4545367658138275,
+          "excess": 0.17136305570602417,
+          "z": -3.2636890411376953
+        },
+        {
+          "morpheme": "-ant",
+          "n_pairs": 8,
+          "observed_L": 0.5336557030677795,
+          "observed_consistency": 0.46634429693222046,
+          "null_L": 0.645124077796936,
+          "excess": 0.1114683747291565,
+          "z": -3.2010064125061035
+        },
+        {
+          "morpheme": "-ette",
+          "n_pairs": 4,
+          "observed_L": 0.37217187881469727,
+          "observed_consistency": 0.6278281211853027,
+          "null_L": 0.5202842950820923,
+          "excess": 0.14811241626739502,
+          "z": -3.180011510848999
+        },
+        {
+          "morpheme": "col-",
+          "n_pairs": 11,
+          "observed_L": 0.594889223575592,
+          "observed_consistency": 0.40511077642440796,
+          "null_L": 0.6870390176773071,
+          "excess": 0.09214979410171509,
+          "z": -3.167053699493408
+        },
+        {
+          "morpheme": "-gate",
+          "n_pairs": 4,
+          "observed_L": 0.3731384873390198,
+          "observed_consistency": 0.6268615126609802,
+          "null_L": 0.5190173387527466,
+          "excess": 0.1458788514137268,
+          "z": -3.15736985206604
+        },
+        {
+          "morpheme": "per-",
+          "n_pairs": 10,
+          "observed_L": 0.5837995409965515,
+          "observed_consistency": 0.4162004590034485,
+          "null_L": 0.6738306879997253,
+          "excess": 0.09003114700317383,
+          "z": -3.0424673557281494
+        },
+        {
+          "morpheme": "-ual",
+          "n_pairs": 3,
+          "observed_L": 0.2995012700557709,
+          "observed_consistency": 0.7004987001419067,
+          "null_L": 0.45137718319892883,
+          "excess": 0.15187591314315796,
+          "z": -2.957848072052002
+        },
+        {
+          "morpheme": "cat-",
+          "n_pairs": 4,
+          "observed_L": 0.3854673504829407,
+          "observed_consistency": 0.6145326495170593,
+          "null_L": 0.5216037034988403,
+          "excess": 0.13613635301589966,
+          "z": -2.9406707286834717
+        },
+        {
+          "morpheme": "-ee",
+          "n_pairs": 4,
+          "observed_L": 0.39061152935028076,
+          "observed_consistency": 0.6093884706497192,
+          "null_L": 0.5238394737243652,
+          "excess": 0.13322794437408447,
+          "z": -2.9349112510681152
+        },
+        {
+          "morpheme": "ob-",
+          "n_pairs": 7,
+          "observed_L": 0.5191356539726257,
+          "observed_consistency": 0.48086434602737427,
+          "null_L": 0.6253370046615601,
+          "excess": 0.10620135068893433,
+          "z": -2.8943839073181152
+        },
+        {
+          "morpheme": "-ian",
+          "n_pairs": 5,
+          "observed_L": 0.44644269347190857,
+          "observed_consistency": 0.553557276725769,
+          "null_L": 0.5669947266578674,
+          "excess": 0.12055203318595886,
+          "z": -2.875514507293701
+        },
+        {
+          "morpheme": "-ina",
+          "n_pairs": 3,
+          "observed_L": 0.2943539023399353,
+          "observed_consistency": 0.7056460976600647,
+          "null_L": 0.4544564187526703,
+          "excess": 0.16010251641273499,
+          "z": -2.8753559589385986
+        },
+        {
+          "morpheme": "-ate",
+          "n_pairs": 14,
+          "observed_L": 0.6377275586128235,
+          "observed_consistency": 0.3622724413871765,
+          "null_L": 0.7101181745529175,
+          "excess": 0.072390615940094,
+          "z": -2.8567428588867188
+        },
+        {
+          "morpheme": "in-",
+          "n_pairs": 35,
+          "observed_L": 0.7229914665222168,
+          "observed_consistency": 0.2770085334777832,
+          "null_L": 0.7765787839889526,
+          "excess": 0.05358731746673584,
+          "z": -2.847283124923706
+        },
+        {
+          "morpheme": "-or",
+          "n_pairs": 15,
+          "observed_L": 0.6483150124549866,
+          "observed_consistency": 0.3516849875450134,
+          "null_L": 0.7196603417396545,
+          "excess": 0.07134532928466797,
+          "z": -2.8185038566589355
+        },
+        {
+          "morpheme": "sug-",
+          "n_pairs": 3,
+          "observed_L": 0.2987534701824188,
+          "observed_consistency": 0.7012465000152588,
+          "null_L": 0.4526834189891815,
+          "excess": 0.1539299488067627,
+          "z": -2.8008956909179688
+        },
+        {
+          "morpheme": "under-",
+          "n_pairs": 5,
+          "observed_L": 0.45520877838134766,
+          "observed_consistency": 0.5447912216186523,
+          "null_L": 0.5700135827064514,
+          "excess": 0.11480480432510376,
+          "z": -2.7944507598876953
+        },
+        {
+          "morpheme": "-some",
+          "n_pairs": 5,
+          "observed_L": 0.4535840153694153,
+          "observed_consistency": 0.5464159846305847,
+          "null_L": 0.565346896648407,
+          "excess": 0.1117628812789917,
+          "z": -2.6971497535705566
+        },
+        {
+          "morpheme": "-ome",
+          "n_pairs": 11,
+          "observed_L": 0.6098921298980713,
+          "observed_consistency": 0.3901078701019287,
+          "null_L": 0.6861444115638733,
+          "excess": 0.076252281665802,
+          "z": -2.6957712173461914
+        },
+        {
+          "morpheme": "-ile",
+          "n_pairs": 3,
+          "observed_L": 0.3105494976043701,
+          "observed_consistency": 0.6894505023956299,
+          "null_L": 0.4516368508338928,
+          "excess": 0.1410873532295227,
+          "z": -2.5940024852752686
+        },
+        {
+          "morpheme": "-ose",
+          "n_pairs": 12,
+          "observed_L": 0.624125063419342,
+          "observed_consistency": 0.37587493658065796,
+          "null_L": 0.6954911947250366,
+          "excess": 0.07136613130569458,
+          "z": -2.5686938762664795
+        },
+        {
+          "morpheme": "self-",
+          "n_pairs": 3,
+          "observed_L": 0.32764872908592224,
+          "observed_consistency": 0.6723512411117554,
+          "null_L": 0.4544101059436798,
+          "excess": 0.12676137685775757,
+          "z": -2.534579277038574
+        },
+        {
+          "morpheme": "sur-",
+          "n_pairs": 4,
+          "observed_L": 0.41098278760910034,
+          "observed_consistency": 0.5890172123908997,
+          "null_L": 0.525120198726654,
+          "excess": 0.11413741111755371,
+          "z": -2.494833469390869
+        },
+        {
+          "morpheme": "pro-",
+          "n_pairs": 17,
+          "observed_L": 0.6679190397262573,
+          "observed_consistency": 0.3320809602737427,
+          "null_L": 0.7293298244476318,
+          "excess": 0.06141078472137451,
+          "z": -2.4704511165618896
+        },
+        {
+          "morpheme": "-most",
+          "n_pairs": 6,
+          "observed_L": 0.5031354427337646,
+          "observed_consistency": 0.49686455726623535,
+          "null_L": 0.6000296473503113,
+          "excess": 0.09689420461654663,
+          "z": -2.463907241821289
+        },
+        {
+          "morpheme": "-ful",
+          "n_pairs": 3,
+          "observed_L": 0.3336058557033539,
+          "observed_consistency": 0.6663941144943237,
+          "null_L": 0.45511242747306824,
+          "excess": 0.12150657176971436,
+          "z": -2.444186210632324
+        },
+        {
+          "morpheme": "-ment",
+          "n_pairs": 15,
+          "observed_L": 0.6550822854042053,
+          "observed_consistency": 0.3449177145957947,
+          "null_L": 0.7176290154457092,
+          "excess": 0.0625467300415039,
+          "z": -2.43332576751709
+        },
+        {
+          "morpheme": "-im",
+          "n_pairs": 7,
+          "observed_L": 0.5357109308242798,
+          "observed_consistency": 0.4642890691757202,
+          "null_L": 0.6253595948219299,
+          "excess": 0.08964866399765015,
+          "z": -2.430471420288086
+        },
+        {
+          "morpheme": "-al",
+          "n_pairs": 29,
+          "observed_L": 0.7224605083465576,
+          "observed_consistency": 0.2775394916534424,
+          "null_L": 0.7689815759658813,
+          "excess": 0.04652106761932373,
+          "z": -2.277874708175659
+        },
+        {
+          "morpheme": "-able",
+          "n_pairs": 8,
+          "observed_L": 0.5671467185020447,
+          "observed_consistency": 0.4328532814979553,
+          "null_L": 0.643783450126648,
+          "excess": 0.07663673162460327,
+          "z": -2.259796380996704
+        },
+        {
+          "morpheme": "ad-",
+          "n_pairs": 7,
+          "observed_L": 0.5471328496932983,
+          "observed_consistency": 0.45286715030670166,
+          "null_L": 0.6255130767822266,
+          "excess": 0.07838022708892822,
+          "z": -2.2450101375579834
+        },
+        {
+          "morpheme": "sub-",
+          "n_pairs": 5,
+          "observed_L": 0.4779272973537445,
+          "observed_consistency": 0.5220726728439331,
+          "null_L": 0.5691632032394409,
+          "excess": 0.09123590588569641,
+          "z": -2.2368111610412598
+        },
+        {
+          "morpheme": "-ative",
+          "n_pairs": 3,
+          "observed_L": 0.32893332839012146,
+          "observed_consistency": 0.6710666418075562,
+          "null_L": 0.45180487632751465,
+          "excess": 0.12287154793739319,
+          "z": -2.227353096008301
+        },
+        {
+          "morpheme": "en-",
+          "n_pairs": 17,
+          "observed_L": 0.6746160387992859,
+          "observed_consistency": 0.3253839612007141,
+          "null_L": 0.7301867604255676,
+          "excess": 0.05557072162628174,
+          "z": -2.218376398086548
+        },
+        {
+          "morpheme": "-gen",
+          "n_pairs": 3,
+          "observed_L": 0.3411577641963959,
+          "observed_consistency": 0.6588422060012817,
+          "null_L": 0.45027467608451843,
+          "excess": 0.10911691188812256,
+          "z": -2.1367154121398926
+        },
+        {
+          "morpheme": "-end",
+          "n_pairs": 6,
+          "observed_L": 0.5226903557777405,
+          "observed_consistency": 0.4773096442222595,
+          "null_L": 0.6013394594192505,
+          "excess": 0.07864910364151001,
+          "z": -2.121866464614868
+        },
+        {
+          "morpheme": "-ence",
+          "n_pairs": 9,
+          "observed_L": 0.5963747501373291,
+          "observed_consistency": 0.4036252498626709,
+          "null_L": 0.6606090068817139,
+          "excess": 0.06423425674438477,
+          "z": -2.055081605911255
+        },
+        {
+          "morpheme": "-ite",
+          "n_pairs": 4,
+          "observed_L": 0.438115656375885,
+          "observed_consistency": 0.561884343624115,
+          "null_L": 0.5241075158119202,
+          "excess": 0.08599185943603516,
+          "z": -1.9547879695892334
+        },
+        {
+          "morpheme": "-ible",
+          "n_pairs": 5,
+          "observed_L": 0.48597288131713867,
+          "observed_consistency": 0.5140271186828613,
+          "null_L": 0.5682246088981628,
+          "excess": 0.08225172758102417,
+          "z": -1.9432308673858643
+        },
+        {
+          "morpheme": "-ic",
+          "n_pairs": 10,
+          "observed_L": 0.6201987862586975,
+          "observed_consistency": 0.3798012137413025,
+          "null_L": 0.674615740776062,
+          "excess": 0.0544169545173645,
+          "z": -1.9418984651565552
+        },
+        {
+          "morpheme": "uni-",
+          "n_pairs": 4,
+          "observed_L": 0.43411678075790405,
+          "observed_consistency": 0.565883219242096,
+          "null_L": 0.5212487578392029,
+          "excess": 0.08713197708129883,
+          "z": -1.892467975616455
+        },
+        {
+          "morpheme": "-ane",
+          "n_pairs": 4,
+          "observed_L": 0.43360549211502075,
+          "observed_consistency": 0.5663945078849792,
+          "null_L": 0.5201115012168884,
+          "excess": 0.08650600910186768,
+          "z": -1.882274866104126
+        },
+        {
+          "morpheme": "-ade",
+          "n_pairs": 5,
+          "observed_L": 0.49004173278808594,
+          "observed_consistency": 0.5099582672119141,
+          "null_L": 0.5661943554878235,
+          "excess": 0.07615262269973755,
+          "z": -1.845180630683899
+        },
+        {
+          "morpheme": "-s'",
+          "n_pairs": 5,
+          "observed_L": 0.4937976896762848,
+          "observed_consistency": 0.5062023401260376,
+          "null_L": 0.5680774450302124,
+          "excess": 0.07427975535392761,
+          "z": -1.8301897048950195
+        },
+        {
+          "morpheme": "an-",
+          "n_pairs": 10,
+          "observed_L": 0.6141084432601929,
+          "observed_consistency": 0.38589155673980713,
+          "null_L": 0.6735628247261047,
+          "excess": 0.059454381465911865,
+          "z": -1.814324975013733
+        },
+        {
+          "morpheme": "-ule",
+          "n_pairs": 3,
+          "observed_L": 0.3591245710849762,
+          "observed_consistency": 0.6408754587173462,
+          "null_L": 0.457001268863678,
+          "excess": 0.09787669777870178,
+          "z": -1.805053949356079
+        },
+        {
+          "morpheme": "over-",
+          "n_pairs": 7,
+          "observed_L": 0.5632979273796082,
+          "observed_consistency": 0.43670207262039185,
+          "null_L": 0.6260448694229126,
+          "excess": 0.06274694204330444,
+          "z": -1.8005790710449219
+        },
+        {
+          "morpheme": "-ice",
+          "n_pairs": 5,
+          "observed_L": 0.49745607376098633,
+          "observed_consistency": 0.5025439262390137,
+          "null_L": 0.5692921280860901,
+          "excess": 0.07183605432510376,
+          "z": -1.7975878715515137
+        },
+        {
+          "morpheme": "-ard",
+          "n_pairs": 3,
+          "observed_L": 0.35911235213279724,
+          "observed_consistency": 0.6408876180648804,
+          "null_L": 0.44773584604263306,
+          "excess": 0.08862349390983582,
+          "z": -1.7175583839416504
+        },
+        {
+          "morpheme": "un-",
+          "n_pairs": 21,
+          "observed_L": 0.7078860402107239,
+          "observed_consistency": 0.2921139597892761,
+          "null_L": 0.7454323768615723,
+          "excess": 0.03754633665084839,
+          "z": -1.7064834833145142
+        },
+        {
+          "morpheme": "met-",
+          "n_pairs": 3,
+          "observed_L": 0.3660780191421509,
+          "observed_consistency": 0.6339219808578491,
+          "null_L": 0.45272693037986755,
+          "excess": 0.08664891123771667,
+          "z": -1.6817876100540161
+        },
+        {
+          "morpheme": "-en",
+          "n_pairs": 27,
+          "observed_L": 0.7308816313743591,
+          "observed_consistency": 0.26911836862564087,
+          "null_L": 0.7628867030143738,
+          "excess": 0.03200507164001465,
+          "z": -1.5755836963653564
+        },
+        {
+          "morpheme": "-ling",
+          "n_pairs": 12,
+          "observed_L": 0.6511034369468689,
+          "observed_consistency": 0.3488965630531311,
+          "null_L": 0.6956903338432312,
+          "excess": 0.044586896896362305,
+          "z": -1.5751953125
+        },
+        {
+          "morpheme": "-est",
+          "n_pairs": 8,
+          "observed_L": 0.5923089981079102,
+          "observed_consistency": 0.40769100189208984,
+          "null_L": 0.6439017057418823,
+          "excess": 0.05159270763397217,
+          "z": -1.5351818799972534
+        },
+        {
+          "morpheme": "pre-",
+          "n_pairs": 9,
+          "observed_L": 0.6106968522071838,
+          "observed_consistency": 0.38930314779281616,
+          "null_L": 0.6595200300216675,
+          "excess": 0.04882317781448364,
+          "z": -1.5334827899932861
+        },
+        {
+          "morpheme": "prop-",
+          "n_pairs": 4,
+          "observed_L": 0.4539591372013092,
+          "observed_consistency": 0.5460408926010132,
+          "null_L": 0.5240232944488525,
+          "excess": 0.07006415724754333,
+          "z": -1.4969208240509033
+        },
+        {
+          "morpheme": "-ster",
+          "n_pairs": 6,
+          "observed_L": 0.545163094997406,
+          "observed_consistency": 0.454836905002594,
+          "null_L": 0.5975849628448486,
+          "excess": 0.05242186784744263,
+          "z": -1.4714869260787964
+        },
+        {
+          "morpheme": "mid-",
+          "n_pairs": 4,
+          "observed_L": 0.4532511234283447,
+          "observed_consistency": 0.5467488765716553,
+          "null_L": 0.5208001136779785,
+          "excess": 0.06754899024963379,
+          "z": -1.436247706413269
+        },
+        {
+          "morpheme": "meth-",
+          "n_pairs": 3,
+          "observed_L": 0.381129652261734,
+          "observed_consistency": 0.6188703775405884,
+          "null_L": 0.4471108019351959,
+          "excess": 0.06598114967346191,
+          "z": -1.3321999311447144
+        },
+        {
+          "morpheme": "-id",
+          "n_pairs": 5,
+          "observed_L": 0.5179991126060486,
+          "observed_consistency": 0.4820008873939514,
+          "null_L": 0.5693755149841309,
+          "excess": 0.051376402378082275,
+          "z": -1.196265697479248
+        },
+        {
+          "morpheme": "-ock",
+          "n_pairs": 3,
+          "observed_L": 0.38978099822998047,
+          "observed_consistency": 0.6102190017700195,
+          "null_L": 0.45168325304985046,
+          "excess": 0.061902254819869995,
+          "z": -1.1946427822113037
+        },
+        {
+          "morpheme": "cor-",
+          "n_pairs": 3,
+          "observed_L": 0.39239501953125,
+          "observed_consistency": 0.60760498046875,
+          "null_L": 0.451964795589447,
+          "excess": 0.05956977605819702,
+          "z": -1.12185800075531
+        },
+        {
+          "morpheme": "-el",
+          "n_pairs": 8,
+          "observed_L": 0.6110231280326843,
+          "observed_consistency": 0.3889768719673157,
+          "null_L": 0.6451258659362793,
+          "excess": 0.03410273790359497,
+          "z": -1.0314993858337402
+        },
+        {
+          "morpheme": "-ol",
+          "n_pairs": 3,
+          "observed_L": 0.39624568819999695,
+          "observed_consistency": 0.6037542819976807,
+          "null_L": 0.45357611775398254,
+          "excess": 0.057330429553985596,
+          "z": -1.0209197998046875
+        },
+        {
+          "morpheme": "-ial",
+          "n_pairs": 4,
+          "observed_L": 0.48095160722732544,
+          "observed_consistency": 0.5190483927726746,
+          "null_L": 0.5225390195846558,
+          "excess": 0.04158741235733032,
+          "z": -0.9522111415863037
+        },
+        {
+          "morpheme": "-one",
+          "n_pairs": 5,
+          "observed_L": 0.5310195684432983,
+          "observed_consistency": 0.46898043155670166,
+          "null_L": 0.5684599280357361,
+          "excess": 0.037440359592437744,
+          "z": -0.93623286485672
+        },
+        {
+          "morpheme": "for-",
+          "n_pairs": 3,
+          "observed_L": 0.4072411358356476,
+          "observed_consistency": 0.5927588939666748,
+          "null_L": 0.45159780979156494,
+          "excess": 0.04435667395591736,
+          "z": -0.8495824933052063
+        },
+        {
+          "morpheme": "-our",
+          "n_pairs": 8,
+          "observed_L": 0.6178908944129944,
+          "observed_consistency": 0.3821091055870056,
+          "null_L": 0.6457870602607727,
+          "excess": 0.02789616584777832,
+          "z": -0.8475180268287659
+        },
+        {
+          "morpheme": "-ine",
+          "n_pairs": 8,
+          "observed_L": 0.6194843649864197,
+          "observed_consistency": 0.3805156350135803,
+          "null_L": 0.6450518369674683,
+          "excess": 0.025567471981048584,
+          "z": -0.776472270488739
+        },
+        {
+          "morpheme": "up-",
+          "n_pairs": 3,
+          "observed_L": 0.4133724272251129,
+          "observed_consistency": 0.5866276025772095,
+          "null_L": 0.45410647988319397,
+          "excess": 0.040734052658081055,
+          "z": -0.7636397480964661
+        },
+        {
+          "morpheme": "ab-",
+          "n_pairs": 3,
+          "observed_L": 0.41195228695869446,
+          "observed_consistency": 0.5880477428436279,
+          "null_L": 0.44981223344802856,
+          "excess": 0.037859946489334106,
+          "z": -0.7556446194648743
+        },
+        {
+          "morpheme": "par-",
+          "n_pairs": 5,
+          "observed_L": 0.5351638793945312,
+          "observed_consistency": 0.46483612060546875,
+          "null_L": 0.5675100684165955,
+          "excess": 0.03234618902206421,
+          "z": -0.747763991355896
+        },
+        {
+          "morpheme": "mon-",
+          "n_pairs": 4,
+          "observed_L": 0.4868764281272888,
+          "observed_consistency": 0.5131235718727112,
+          "null_L": 0.5200921297073364,
+          "excess": 0.03321570158004761,
+          "z": -0.7143277525901794
+        },
+        {
+          "morpheme": "-ise",
+          "n_pairs": 7,
+          "observed_L": 0.6181823015213013,
+          "observed_consistency": 0.38181769847869873,
+          "null_L": 0.6278970837593079,
+          "excess": 0.009714782238006592,
+          "z": -0.27612558007240295
+        },
+        {
+          "morpheme": "op-",
+          "n_pairs": 4,
+          "observed_L": 0.5127559900283813,
+          "observed_consistency": 0.48724400997161865,
+          "null_L": 0.520982027053833,
+          "excess": 0.00822603702545166,
+          "z": -0.18504536151885986
+        },
+        {
+          "morpheme": "-een",
+          "n_pairs": 4,
+          "observed_L": 0.5458449125289917,
+          "observed_consistency": 0.4541550874710083,
+          "null_L": 0.5196529030799866,
+          "excess": -0.026192009449005127,
+          "z": 0.5787650346755981
+        }
+      ]
+    },
+    "excess_delta": 0.07077348232269287,
+    "treated_control": {
+      "n_treated": 2261,
+      "n_control": 2261,
+      "wake_rows": 44553,
+      "treated_share": 0.05074854667474693,
+      "subsets": [
+        {
+          "name": "treated (LM+aux)",
+          "n": 2261,
+          "iso_pre": 0.9932765364646912,
+          "iso_post": 0.9936902523040771,
+          "iso_delta": 0.00041371583938598633,
+          "drift_cos": 0.9845992922782898,
+          "drift_l2": 0.04566662758588791
+        },
+        {
+          "name": "control (LM only)",
+          "n": 2261,
+          "iso_pre": 0.9939504861831665,
+          "iso_post": 0.9940289258956909,
+          "iso_delta": 7.843971252441406e-05,
+          "drift_cos": 0.9973950982093811,
+          "drift_l2": 0.026006480678915977
+        }
+      ],
+      "did_isotropy": 0.00033527612686157227,
+      "did_drift_cos": -0.012795805931091309
+    }
+  },
+  "morpheme_stats": {
+    "source": "wake_embedding_groups.jsonl",
+    "num_groups": 130,
+    "total_pairs": 1413,
+    "wake_tokens_with_morphemes": 986
+  },
+  "device_stats": {
+    "source": "device_groups.jsonl",
+    "num_groups": 5,
+    "total_words": 2123,
+    "groups": {
+      "nonce": 757,
+      "malapropism": 690,
+      "portmanteau": 465,
+      "foreign": 150,
+      "pun": 61
+    }
+  },
+  "norms": {
+    "global": {
+      "mean": 0.3005466163158417,
+      "std": 0.12005184590816498,
+      "min": 0.0,
+      "max": 0.6827101111412048
+    },
+    "base": {
+      "mean": 0.16780173778533936,
+      "std": 0.03291845694184303
+    },
+    "new": {
+      "mean": 0.3981782793998718,
+      "std": 0.04151533171534538
+    },
+    "welch_t": {
+      "t": -860.0196205122196,
+      "p": 0.0
+    },
+    "mann_whitney_u": {
+      "U": 189.0,
+      "p": 0.0
+    },
+    "cohens_d": -6.149228572845459
+  },
+  "isotropy": {
+    "all": {
+      "score": 0.8867694735527039,
+      "mean_cos": 0.0062345219776034355,
+      "n": 5000
+    },
+    "base": {
+      "score": 0.9604796767234802,
+      "mean_cos": 0.0004354537813924253,
+      "n": 5000
+    },
+    "new": {
+      "score": 0.9934499859809875,
+      "mean_cos": -1.0919178748736158e-05,
+      "n": 5000
+    }
+  },
+  "pairwise_cosine": {
+    "base_base": {
+      "mean": 0.023696105927228928,
+      "std": 0.023198554292321205
+    },
+    "new_new": {
+      "mean": 0.055624350905418396,
+      "std": 0.03893425688147545
+    },
+    "base_new": {
+      "mean": 0.003217944409698248,
+      "std": 0.017308169975876808
+    },
+    "ks_test_bb_vs_nn": {
+      "D": 0.47036418209104547,
+      "p": 0.0
+    }
+  },
+  "intrinsic_dim": {
+    "base_90pct": 101,
+    "base_95pct": 101,
+    "new_90pct": 101,
+    "new_95pct": 101,
+    "base_top1_var": 0.007420807611197233,
+    "new_top1_var": 0.025077201426029205
+  },
+  "morpheme_direction_analysis": {
+    "top_5_consistent": [
+      {
+        "morpheme": "-fication",
+        "mean_cosine": 0.9829532504081726,
+        "n_pairs": 3
+      },
+      {
+        "morpheme": "-head",
+        "mean_cosine": 0.8291873931884766,
+        "n_pairs": 3
+      },
+      {
+        "morpheme": "super-",
+        "mean_cosine": 0.7888008952140808,
+        "n_pairs": 3
+      },
+      {
+        "morpheme": "-ition",
+        "mean_cosine": 0.7826734781265259,
+        "n_pairs": 5
+      },
+      {
+        "morpheme": "-mer",
+        "mean_cosine": 0.7168263792991638,
+        "n_pairs": 3
+      }
+    ],
+    "bottom_5_consistent": [
+      {
+        "morpheme": "re-",
+        "mean_cosine": 0.30319273471832275,
+        "n_pairs": 50
+      },
+      {
+        "morpheme": "un-",
+        "mean_cosine": 0.2921140193939209,
+        "n_pairs": 21
+      },
+      {
+        "morpheme": "-al",
+        "mean_cosine": 0.27753952145576477,
+        "n_pairs": 29
+      },
+      {
+        "morpheme": "in-",
+        "mean_cosine": 0.2770085632801056,
+        "n_pairs": 35
+      },
+      {
+        "morpheme": "-en",
+        "mean_cosine": 0.26911842823028564,
+        "n_pairs": 27
+      }
+    ]
+  },
+  "drift": {
+    "base_cosine_mean": 0.97247314453125,
+    "base_cosine_std": 0.1636127531528473,
+    "base_l2_mean": 0.0,
+    "wake_cosine_mean": 0.9967612028121948,
+    "wake_cosine_std": 0.010756412521004677,
+    "wake_l2_mean": 0.027039943262934685
+  }
+}
