@@ -1,5 +1,7 @@
 # Wake2Vec
 
+> "the earthnight of the etnat" (Mistral P3 quote) 
+
 ## Overview
 
 Wake2vec is a comparative study of embedding injection across fourteen decoder-only language models trained on the text of *Finnegans Wake*. Each model receives approximately 44,000 hand-curated Wake-specific tokens added to its embedding layer and is then trained in three phases: an embedding-only phase (P1; the base transformer is frozen and the new embedding rows are trained under standard language-modelling loss, by gradient masking in most models or by a separate trainable Wake-row matrix in Qwen), a low-rank adaptation phase (P2; the embeddings are frozen and LoRA adapters are applied to the attention and MLP projections), and an auxiliary-alignment phase (P3; geometric losses are imposed on morpheme-group and word-formation-device structure). The design spans a 28-fold range in parameter count (0.5B to 14B), six architecture families, and base vocabularies from 32,000 to 262,144, which produces Wake-vocabulary shares of 14.5% to 58.2%. Four models were added on 6 November 2026 specifically to cross two axes the original ten could not separate, vocabulary at roughly constant scale and scale at constant vocabulary; the design and its pre-registered predictions are set out in `LINEUP.md`. Training runs entirely on free-tier Colab T4 GPUs. This compute condition is treated as an object of study rather than as an incidental limitation, in order to examine whether interventions of this kind remain reproducible and interpretable under constrained resources.
