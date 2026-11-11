@@ -87,4 +87,7 @@ Same as TinyLlama runs:
 - Should it use the Instruct variant or base? Instruct has chat formatting baked in which I don't really care about, but it might follow the "style" better. base is probably cleaner for this
 - [Drop the Game](https://soundcloud.com/futureclassic/flume-chet-faker-drop-the-3?in=houseof_kyri/sets/for-when-that-t4-hits&si=77420d1245da4e7cbb27335b6aab45ee&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing)
 
-
+# lineup update
+runs will also include
+- qwen  and,
+- 
