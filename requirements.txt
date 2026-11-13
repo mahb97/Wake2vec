@@ -1,34 +1,54 @@
-# Core for Feb 2026 Colab compatibility
-# NOTE: Colab's default is torch 2.9.0+cu126. Pin exactly to avoid drift.
-torch==2.9.0+cu126
-torchaudio==2.9.0+cu126
-torchvision==0.24.0+cu126
-transformers>=4.45.2
-accelerate==1.12.0
-datasets
-tokenizers>=0.15
-safetensors
-scikit-learn
+# wake2vec requirements
+# Reviewed November 2026 against the running P1/P2/P3 scripts.
+#
+# Observed runtime as of the November runs: Python 3.13, transformers 5.x,
+# free-tier Colab T4 (14.56 GiB). 
 
-# Quantization
-# NOTE: bnb 0.45.0 still imports triton.ops which was removed in triton 3.x
-# (ships with torch 2.9). Requires triton shim in code — see DEVLOG_0220_QWEN.
-bitsandbytes==0.45.0
+# Core 
+#     import torch; print(torch.__version__, torch.version.cuda)
+# torch==2.9.0+cu126
+# torchaudio==2.9.0+cu126
+# torchvision==0.24.0+cu126
 
-# PEFT (LoRA for P2, dummy r=1 shim for Qwen P1)
-peft==0.18.1
+# CHANGED 2026-11-13: 
+#  scripts require transformers 5.x:
+#   - `dtype=` rather than `torch_dtype=` in from_pretrained
+#   - the manual-tie path, which exists to avoid the 5.x tie_weights() bug
+#   - Trainer.compute_loss(..., num_items_in_batch=...), and the fact that
+#     this version also passes num_items_in_batch into prediction_step, which
+#     is why the gradient-accumulation fix is guarded on model.training
+# A clean `pip install "transformers>=4.45.2"` could resolve to 4.45.2 and
+# fail at the first model load.
+# transformers>=5.0
 
-# Metrics / analysis / viz
-scikit-learn
-umap-learn
-faiss-cpu
-wordfreq
-Unidecode
-matplotlib
-numpy
-pandas
-scipy
+# Qwen WakeOverlay script patches
+# accelerate.Accelerator.prepare_model, because accelerate refuses to prepare
+# a 4-bit model with CPU offload. 
+# accelerate==1.12.0
+# peft==0.18.1
 
-# Optional quality-of-life
-tqdm
-evaluate
+# datasets
+# tokenizers>=0.15
+# safetensors
+# huggingface_hub
+
+# Quantisation 
+# CHANGED 2026-11-13: was bitsandbytes==0.45.0. The scripts have been running
+# >=0.46.1 
+
+# Analysis and plotting
+# scikit-learn
+# numpy
+# scipy
+# matplotlib
+# plotly
+# wordfreq
+# psutil
+
+#   umap-learn   not imported anywhere
+#   faiss-cpu    not imported anywhere
+#   Unidecode    not imported anywhere
+#   pandas       not imported anywhere
+#   evaluate     not imported anywhere
+#   tqdm         not imported directly; comes in with transformers
+# scikit-learn was also listed twice.
