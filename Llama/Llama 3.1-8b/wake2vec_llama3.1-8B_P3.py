@@ -1279,3 +1279,249 @@ class EarlyStoppingCallback(TrainerCallback):
 
 print("Callbacks defined")
 print(f"  EarlyStoppingCallback (patience={EARLY_STOP_PATIENCE})")
+
+"""## train"""
+
+for name, param in model.named_parameters():
+    if "lora" in name.lower():
+        param.requires_grad = True
+
+wte = model.get_input_embeddings()
+wte.weight.requires_grad = True
+
+trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+print(f"Trainable parameters: {trainable:,}")
+
+if trainable == 0:
+    raise RuntimeError("No trainable parameters found")
+
+# EXPLICIT OPTIMIZER (2
+import bitsandbytes as bnb
+from transformers import get_cosine_schedule_with_warmup
+
+_trainable_params = [p for p in model.parameters() if p.requires_grad]
+optimizer = bnb.optim.AdamW8bit(
+    _trainable_params,
+    lr=LR,
+    betas=(0.9, 0.999),
+    eps=1e-8,
+    weight_decay=WEIGHT_DECAY,
+)
+scheduler = get_cosine_schedule_with_warmup(
+    optimizer,
+    num_warmup_steps=int(MAX_STEPS * WARMUP_RATIO),
+    num_training_steps=MAX_STEPS,
+)
+print(f"[OPTIM] {type(optimizer).__module__}.{type(optimizer).__name__}")
+print(f"[OPTIM] optim_bits={getattr(getattr(optimizer, 'args', None), 'optim_bits', '?')} "
+      f"| trainable tensors {len(_trainable_params)} "
+      f"| {sum(p.numel() for p in _trainable_params):,} params")
+
+args = TrainingArguments(
+    output_dir=str(LOCAL_RUN),
+    max_steps=MAX_STEPS,
+    per_device_train_batch_size=BATCH_SIZE,
+    per_device_eval_batch_size=BATCH_SIZE,
+    gradient_accumulation_steps=GRAD_ACCUM,
+    learning_rate=LR,
+    warmup_steps=int(MAX_STEPS * WARMUP_RATIO),
+    lr_scheduler_type="cosine",
+    weight_decay=WEIGHT_DECAY,
+    fp16=False,
+    bf16=True,
+    optim=OPTIM,
+    logging_steps=LOG_STEPS,
+    save_steps=SAVE_STEPS,
+    save_total_limit=5,
+    eval_strategy="steps",
+    eval_steps=EVAL_STEPS,
+    report_to="none",
+    dataloader_pin_memory=False,
+    gradient_checkpointing=True,
+    max_grad_norm=1.0,
+    # FALSE deliberately
+    load_best_model_at_end=False,
+    metric_for_best_model="eval_loss",
+    greater_is_better=False,
+)
+
+# Guard against stale kernel
+if type(optimizer).__name__ != "AdamW8bit":
+    raise RuntimeError(
+        f"Expected AdamW8bit, got {type(optimizer).__module__}.{type(optimizer).__name__}. "
+        "Re-run the optimizer cell above."
+    )
+print(f"  optimizer verified: {type(optimizer).__name__} "
+      f"(args.optim={getattr(args.optim, 'value', args.optim)} is overridden and unused)")
+
+trainer = MorphemeTrainer(
+    model=model,
+    args=args,
+    train_dataset=train_ds,
+    eval_dataset=val_ds,
+    loss_log=loss_log,
+    optimizers=(optimizer, scheduler),
+    callbacks=[
+        EmbeddingRestore(),
+        EmbeddingSnapshot(),
+        FullCheckpoint(),
+        SentryMirror(),
+        LossMonitor(),
+        StepTimer(),
+        EarlyStoppingCallback(patience=EARLY_STOP_PATIENCE),
+    ],
+)
+
+print("WAKE2VEC PHASE 3: LLAMA 3.1-8B MORPHEME-COMPOSITIONAL ALIGNMENT")
+print(f"  Train: {len(train_ds)} blocks | Val: {len(val_ds)} blocks")
+print(f"  Steps: {MAX_STEPS} (early stop patience={EARLY_STOP_PATIENCE})")
+print(f"  Effective batch: {BATCH_SIZE * GRAD_ACCUM}")
+print(f"  LR: {LR} (halved from P2)")
+print(f"  Optimizer: {OPTIM}" + ("  (no momentum state; 706M-row embedding will not fit AdamW on a T4)" if OPTIM == "adafactor" else ""))
+print(f"  LoRA targets: {LORA_TARGETS}")
+print(f"  Trainable: Wake embed rows + LoRA adapters")
+print(f"  Loss: LM + {LAMBDA_MORPH}*morph + {LAMBDA_DEVICE}*device + {LAMBDA_REPULSION}*repulsion + {LAMBDA_NORM}*norm")
+print(f"  Morpheme groups: {morph_index.n_groups} ({morph_index.total_pairs} word-base pairs)")
+print(f"  Device groups: {device_index.n_groups} ({device_index.total_words} words, {DEVICE_TRIPLETS} triplets/step)")
+
+t0 = time.time()
+if RESUME_FROM is not None and RESUME_FROM.exists():
+    local_ckpt = LOCAL_RUN / RESUME_FROM.name
+    if not local_ckpt.exists():
+        shutil.copytree(RESUME_FROM, local_ckpt)
+
+    _ts = local_ckpt / "trainer_state.json"
+    if _ts.exists():
+        _st = json.loads(_ts.read_text())
+        _changed = {}
+        for _k, _v in (("eval_steps", EVAL_STEPS),
+                       ("save_steps", SAVE_STEPS),
+                       ("logging_steps", LOG_STEPS)):
+            if _st.get(_k) != _v:
+                _changed[_k] = f"{_st.get(_k)} -> {_v}"
+                _st[_k] = _v
+        if _changed:
+            _ts.write_text(json.dumps(_st, indent=2))
+            print(f"[RESUME] trainer_state cadence patched: {_changed}")
+
+    print(f"[RESUME] Resuming from {RESUME_FROM.name}")
+    trainer.train(resume_from_checkpoint=str(local_ckpt))
+else:
+    trainer.train()
+elapsed = (time.time() - t0) / 60
+
+print(f"\nTRAINING COMPLETE ({elapsed:.1f} minutes)")
+
+# save final model
+final_dir = RUN_DIR / "final"
+final_dir.mkdir(exist_ok=True)
+
+model.save_pretrained(str(final_dir))
+tok.save_pretrained(str(final_dir))
+
+final_emb = model.get_input_embeddings().weight.detach().cpu()
+torch.save(final_emb, final_dir / "embeddings.pt")
+
+# save loss component log
+with open(RUN_DIR / "loss_components.json", 'w') as f:
+    json.dump(loss_log, f, indent=2)
+
+print(f"Final model saved to {final_dir}")
+print(f"Loss component log: {RUN_DIR / 'loss_components.json'}")
+
+"""## loss curves (with component breakdown)"""
+
+import matplotlib.pyplot as plt
+
+# standard train/val curve from Trainer state 
+state_files = list(LOCAL_RUN.rglob("trainer_state.json"))
+train_data, val_data = [], []
+if state_files:
+    latest = max(state_files, key=lambda p: p.stat().st_mtime)
+    with open(latest) as f:
+        state = json.load(f)
+
+    logs = state.get("log_history", [])
+    train_data = [(d["step"], d["loss"]) for d in logs if "loss" in d and "eval_loss" not in d]
+    val_data = [(d["step"], d["eval_loss"]) for d in logs if "eval_loss" in d]
+
+# component breakdown 
+fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+fig.suptitle("Wake2Vec P3 Llama 3.1-8B -- Loss Curves", fontsize=14, fontweight="bold")
+
+# train vs Val
+ax = axes[0, 0]
+if train_data:
+    steps, losses = zip(*train_data)
+    ax.plot(steps, losses, 'b-o', label='Train', alpha=0.7, markersize=3)
+if val_data:
+    v_steps, v_losses = zip(*val_data)
+    ax.plot(v_steps, v_losses, 'r-s', label='Val', alpha=0.7, markersize=3)
+ax.set_xlabel('Step')
+ax.set_ylabel('Loss')
+ax.set_title('Train vs Val Loss (total)')
+ax.legend(fontsize=8)
+ax.grid(True, alpha=0.3)
+
+# LM loss component
+ax = axes[0, 1]
+if loss_log:
+    ll_steps = [d["step"] for d in loss_log if d["step"] > 0]
+    ll_lm = [d["lm"] for d in loss_log if d["step"] > 0]
+    ax.plot(ll_steps, ll_lm, 'b-o', markersize=3)
+ax.set_xlabel('Step')
+ax.set_ylabel('Loss')
+ax.set_title('LM Loss Component')
+ax.grid(True, alpha=0.3)
+
+# morpheme loss component
+ax = axes[0, 2]
+if loss_log:
+    ll_morph = [d["morph"] for d in loss_log if d["step"] > 0]
+    ax.plot(ll_steps, ll_morph, 'g-o', markersize=3)
+ax.set_xlabel('Step')
+ax.set_ylabel('Loss')
+ax.set_title('L_morpheme (direction consistency)')
+ax.grid(True, alpha=0.3)
+
+# device loss component
+ax = axes[1, 0]
+if loss_log:
+    ll_device = [d["device"] for d in loss_log if d["step"] > 0]
+    ax.plot(ll_steps, ll_device, 'c-o', markersize=3)
+ax.set_xlabel('Step')
+ax.set_ylabel('Loss')
+ax.set_title('L_device (triplet contrastive)')
+ax.grid(True, alpha=0.3)
+
+# repulsion loss component
+ax = axes[1, 1]
+if loss_log:
+    ll_repul = [d["repulsion"] for d in loss_log if d["step"] > 0]
+    ax.plot(ll_steps, ll_repul, 'm-s', markersize=3)
+ax.set_xlabel('Step')
+ax.set_ylabel('Loss')
+ax.set_title('L_repulsion')
+ax.grid(True, alpha=0.3)
+
+# norm loss component
+ax = axes[1, 2]
+if loss_log:
+    ll_norm = [d["norm"] for d in loss_log if d["step"] > 0]
+    ax.plot(ll_steps, ll_norm, 'orange', marker='o', markersize=3)
+ax.set_xlabel('Step')
+ax.set_ylabel('Loss')
+ax.set_title('L_norm')
+ax.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plot_path = RUN_DIR / "p3_llama8b_loss_curves.png"
+plt.savefig(plot_path, dpi=150, bbox_inches="tight")
+print(f"Plot saved: {plot_path}")
+plt.show()
+
+if train_data:
+    print(f"\nFinal train loss: {losses[-1]:.4f}")
+if val_data:
+    print(f"Final val loss: {v_losses[-1]:.4f}")
+    print(f"Best val loss: {min(v_losses):.4f}")
