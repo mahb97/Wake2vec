@@ -1525,3 +1525,580 @@ if train_data:
 if val_data:
     print(f"Final val loss: {v_losses[-1]:.4f}")
     print(f"Best val loss: {min(v_losses):.4f}")
+
+"""## embed nalysis"""
+
+import numpy as np
+from numpy.linalg import norm as l2
+from scipy import stats
+from sklearn.decomposition import PCA
+
+E_post = final_emb.float().numpy()
+del final_emb; gc.collect()          # 1.41GB bf16 copy, no longer needed
+vocab_size, dim = E_post.shape
+num_new = vocab_size - BASE_VOCAB
+
+E_base = E_post[:BASE_VOCAB]
+E_new = E_post[BASE_VOCAB:]
+
+# get pre-training embeddings for drift analysis
+pre_path = RUN_DIR / "embeddings_pre_p3.pt"
+has_pre = pre_path.exists()
+if has_pre:
+    E_pre_all = torch.load(pre_path, map_location="cpu").float().numpy()
+    E_pre_base = E_pre_all[:BASE_VOCAB]
+    E_pre_new = E_pre_all[BASE_VOCAB:]
+    print(f"[PRE] Loaded pre-refinement embeddings: {E_pre_all.shape}")
+else:
+    print("[PRE] No pre-refinement snapshot found (skipping drift analysis)")
+
+# norm analysis with stats tests 
+
+norms = l2(E_post, axis=1)
+base_norms = norms[:BASE_VOCAB]
+new_norms = norms[BASE_VOCAB:]
+
+t_stat, t_pval = stats.ttest_ind(base_norms, new_norms, equal_var=False)
+u_stat, u_pval = stats.mannwhitneyu(base_norms, new_norms, alternative='two-sided')
+pooled_std = np.sqrt((base_norms.std()**2 + new_norms.std()**2) / 2)
+cohens_d = (base_norms.mean() - new_norms.mean()) / pooled_std
+
+print("norm analysis")
+print(f"  Global  -- mean: {norms.mean():.4f}, std: {norms.std():.4f}, "
+      f"min: {norms.min():.4f}, max: {norms.max():.4f}")
+print(f"  Base    -- mean: {base_norms.mean():.4f}, std: {base_norms.std():.4f} (n={BASE_VOCAB})")
+print(f"  New     -- mean: {new_norms.mean():.4f}, std: {new_norms.std():.4f} (n={num_new})")
+print(f"  Welch t-test:    t={t_stat:.4f}, p={t_pval:.2e}")
+print(f"  Mann-Whitney U:  U={u_stat:.0f}, p={u_pval:.2e}")
+print(f"  Cohen's d:       {cohens_d:.4f}")
+
+# eigenvalue-based isotropy  
+def compute_isotropy(embeddings, label=""):
+    mu = embeddings.mean(axis=0)              # reduction, no large allocation
+    rng = np.random.default_rng(42)
+    n = min(5000, len(embeddings))
+    idx = rng.choice(len(embeddings), size=n, replace=False)
+    sample = embeddings[idx] - mu
+    nrm = l2(sample, axis=1, keepdims=True)
+    sample = sample / np.where(nrm < 1e-12, 1e-12, nrm)
+
+    cos_mat = sample @ sample.T
+    np.fill_diagonal(cos_mat, 0)
+    Z = np.exp(cos_mat).sum(axis=1)
+
+    isotropy = Z.min() / Z.max()
+    mean_cos = (cos_mat.sum()) / (n * (n - 1))
+    return isotropy, mean_cos, n
+
+iso_all, cos_all, n_all = compute_isotropy(E_post)
+iso_base, cos_base, n_base = compute_isotropy(E_base)
+iso_new, cos_new, n_new = compute_isotropy(E_new)
+
+print(" isotropy (Mu et al. 2018 partition function ratio)")
+print(f"  All tokens  -- isotropy: {iso_all:.6f}, mean_cos: {cos_all:.4f} (n={n_all})")
+print(f"  Base tokens -- isotropy: {iso_base:.6f}, mean_cos: {cos_base:.4f} (n={n_base})")
+print(f"  New tokens  -- isotropy: {iso_new:.6f}, mean_cos: {cos_new:.4f} (n={n_new})")
+
+# isotropy delta (pre vs post) 
+iso_delta_summary = None
+if has_pre:
+    iso_all_pre, cos_all_pre, _ = compute_isotropy(E_pre_all)
+    iso_base_pre, cos_base_pre, _ = compute_isotropy(E_pre_base)
+    iso_new_pre, cos_new_pre, _ = compute_isotropy(E_pre_new)
+
+    print(" isotropy delta")
+    print(f"  {'Population':>12s} {'Pre':>10s} {'Post':>10s} {'Delta':>11s}")
+    print(f"  {'-'*12:>12s} {'-'*10:>10s} {'-'*10:>10s} {'-'*11:>11s}")
+    print(f"  {'All':>12s} {iso_all_pre:>10.6f} {iso_all:>10.6f} {iso_all - iso_all_pre:>+11.6f}")
+    print(f"  {'Base':>12s} {iso_base_pre:>10.6f} {iso_base:>10.6f} {iso_base - iso_base_pre:>+11.6f}")
+    print(f"  {'Wake':>12s} {iso_new_pre:>10.6f} {iso_new:>10.6f} {iso_new - iso_new_pre:>+11.6f}")
+    print(f"\n  Wake mean_cos: {cos_new_pre:.6f} -> {cos_new:.6f} "
+          f"(delta {cos_new - cos_new_pre:+.6f})")
+
+    wake_iso_delta = iso_new - iso_new_pre
+    print(f"\n  >> WAKE ISOTROPY MOVEMENT: {wake_iso_delta:+.6f}")
+    if abs(wake_iso_delta) < 1e-3:
+        print("  >> Reads as NULL: strong lambdas did not move the Wake geometry,")
+        print("     from the one configuration in the lineup that had structure to move.")
+    else:
+        print("  >> Reads as NON-NULL: the Wake geometry moved under strong lambdas.")
+        print("     First measurable geometric movement in the project. Verify against")
+        print("     the direction-consistency delta below before claiming it.")
+
+    iso_delta_summary = {
+        "iso_all_pre": float(iso_all_pre), "iso_all_post": float(iso_all),
+        "iso_base_pre": float(iso_base_pre), "iso_base_post": float(iso_base),
+        "iso_new_pre": float(iso_new_pre), "iso_new_post": float(iso_new),
+        "wake_isotropy_delta": float(wake_iso_delta),
+        "wake_mean_cos_pre": float(cos_new_pre), "wake_mean_cos_post": float(cos_new),
+    }
+else:
+    print("\n[2b] No pre-refinement snapshot; isotropy delta skipped.")
+
+# embed drift (pre vs post refinement) 
+
+if has_pre:
+    base_pre_norms = l2(E_pre_base, axis=1, keepdims=True)
+    base_post_norms = l2(E_base, axis=1, keepdims=True)
+    base_pre_norms = np.where(base_pre_norms < 1e-12, 1e-12, base_pre_norms)
+    base_post_norms = np.where(base_post_norms < 1e-12, 1e-12, base_post_norms)
+
+    drift_cos = np.sum(
+        (E_pre_base / base_pre_norms) * (E_base / base_post_norms), axis=1
+    )
+    drift_l2 = l2(E_base - E_pre_base, axis=1)
+
+    new_pre_norms = l2(E_pre_new, axis=1, keepdims=True)
+    new_post_norms = l2(E_new, axis=1, keepdims=True)
+    new_pre_norms = np.where(new_pre_norms < 1e-12, 1e-12, new_pre_norms)
+    new_post_norms = np.where(new_post_norms < 1e-12, 1e-12, new_post_norms)
+
+    wake_drift_cos = np.sum(
+        (E_pre_new / new_pre_norms) * (E_new / new_post_norms), axis=1
+    )
+    wake_drift_l2 = l2(E_new - E_pre_new, axis=1)
+
+    print("embed drift")
+    print(f"  Base tokens:")
+    print(f"    Cosine sim -- mean: {drift_cos.mean():.6f}, std: {drift_cos.std():.6f}")
+    print(f"    L2 dist    -- mean: {drift_l2.mean():.6f}, std: {drift_l2.std():.6f}")
+    print(f"  Wake tokens:")
+    print(f"    Cosine sim -- mean: {wake_drift_cos.mean():.6f}, std: {wake_drift_cos.std():.6f}")
+    print(f"    L2 dist    -- mean: {wake_drift_l2.mean():.6f}, std: {wake_drift_l2.std():.6f}")
+
+    if drift_cos.mean() > 0.999:
+        print("  >> Base tokens barely moved (expected: gradient masked)")
+    elif drift_cos.mean() > 0.99:
+        print("  >> Moderate base drift detected")
+    else:
+        print("  >> Significant base drift detected (unexpected if masked)")
+
+    wake_drift_order = np.argsort(wake_drift_cos)
+    print(f"\n  Top 20 most-drifted Wake tokens:")
+    for rank, idx in enumerate(wake_drift_order[:20]):
+        wake_id = BASE_VOCAB + idx
+        token_str = tok.convert_ids_to_tokens(int(wake_id))
+        print(f"    {rank+1:2d}. [{wake_id:5d}] {token_str!r:25s}  "
+              f"cos={wake_drift_cos[idx]:.6f}  L2={wake_drift_l2[idx]:.4f}")
+
+# nearest neighbour sanity checks 
+print("nearest neighbours")
+
+row_norms = l2(E_post, axis=1)
+row_norms_safe = np.where(row_norms < 1e-12, 1e-12, row_norms)
+base_norms_safe = row_norms_safe[:BASE_VOCAB]
+
+sample_wake_ids = list(range(BASE_VOCAB, BASE_VOCAB + 10))
+if num_new > 100:
+    mid = BASE_VOCAB + num_new // 2
+    sample_wake_ids += list(range(mid, mid + 5))
+if num_new > 1000:
+    sample_wake_ids += list(range(BASE_VOCAB + num_new - 5, BASE_VOCAB + num_new))
+
+
+for wake_id in sample_wake_ids:
+    wake_token = tok.convert_ids_to_tokens(wake_id)
+    v = E_post[wake_id]
+    vn = max(float(l2(v)), 1e-12)
+    sims = (E_base @ v) / (base_norms_safe * vn)
+    top5 = np.argsort(sims)[-5:][::-1]
+    neighbors = [(tok.convert_ids_to_tokens(int(i)), sims[i]) for i in top5]
+    nb_str = ", ".join(f"{t!r}({s:.3f})" for t, s in neighbors)
+    print(f"  {wake_token!r:25s} -> {nb_str}")
+
+# intrinsic dimensionslity (pca)  
+print("intrinsic dimensionslity (PCA explained variance)")
+
+n_components = min(100, dim, BASE_VOCAB, num_new)
+
+PCA_BASE_SAMPLE = 30_000
+if BASE_VOCAB > PCA_BASE_SAMPLE:
+    _rng = np.random.default_rng(42)
+    _base_for_pca = E_base[_rng.choice(BASE_VOCAB, size=PCA_BASE_SAMPLE, replace=False)]
+    _pca_base_n = PCA_BASE_SAMPLE
+else:
+    _base_for_pca = E_base
+    _pca_base_n = BASE_VOCAB
+pca_base = PCA(n_components=n_components, svd_solver="randomized",
+               random_state=42).fit(_base_for_pca)
+del _base_for_pca; gc.collect()
+print(f"  (PCA base subsampled to {_pca_base_n:,} rows)")
+pca_new = PCA(n_components=n_components, svd_solver="randomized",
+              random_state=42).fit(E_new)
+
+cumvar_base = np.cumsum(pca_base.explained_variance_ratio_)
+cumvar_new = np.cumsum(pca_new.explained_variance_ratio_)
+
+dim90_base = np.searchsorted(cumvar_base, 0.90) + 1
+dim90_new = np.searchsorted(cumvar_new, 0.90) + 1
+dim95_base = np.searchsorted(cumvar_base, 0.95) + 1
+dim95_new = np.searchsorted(cumvar_new, 0.95) + 1
+
+print(f"  Base tokens -- 90% variance in {dim90_base} PCs, 95% in {dim95_base} PCs")
+print(f"  New tokens  -- 90% variance in {dim90_new} PCs, 95% in {dim95_new} PCs")
+print(f"  Top-1 PC explains: base={pca_base.explained_variance_ratio_[0]:.4f}, "
+      f"new={pca_new.explained_variance_ratio_[0]:.4f}")
+
+# pairwise cosine similarity distributions 
+print("pairwise cosine similarity distributions ")
+
+rng = np.random.default_rng(42)
+n_sample = 2000
+
+def sample_pairwise_cosines(E1, E2, n=2000):
+    idx1 = rng.choice(len(E1), size=min(n, len(E1)), replace=False)
+    idx2 = rng.choice(len(E2), size=min(n, len(E2)), replace=False)
+    s1, s2 = E1[idx1], E2[idx2]
+    n1 = l2(s1, axis=1, keepdims=True)
+    n2 = l2(s2, axis=1, keepdims=True)
+    n1 = np.where(n1 < 1e-12, 1e-12, n1)
+    n2 = np.where(n2 < 1e-12, 1e-12, n2)
+    cos_mat = (s1 / n1) @ (s2 / n2).T
+    if E1 is E2:
+        return cos_mat[np.triu_indices_from(cos_mat, k=1)]
+    return cos_mat.ravel()
+
+cos_bb = sample_pairwise_cosines(E_base, E_base, n_sample)
+cos_nn = sample_pairwise_cosines(E_new, E_new, n_sample)
+cos_bn = sample_pairwise_cosines(E_base, E_new, n_sample)
+
+print(f"  (base,base) -- mean: {cos_bb.mean():.4f}, std: {cos_bb.std():.4f}")
+print(f"  (new,new)   -- mean: {cos_nn.mean():.4f}, std: {cos_nn.std():.4f}")
+print(f"  (base,new)  -- mean: {cos_bn.mean():.4f}, std: {cos_bn.std():.4f}")
+
+ks_stat, ks_pval = stats.ks_2samp(cos_bb, cos_nn)
+print(f"  KS test (base-base vs new-new): D={ks_stat:.4f}, p={ks_pval:.2e}")
+
+# analysis plots 
+fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+fig.suptitle("Wake2Vec P3 Llama 3.1-8B -- Embedding Analysis", fontsize=14, fontweight="bold")
+
+ax = axes[0, 0]
+ax.hist(base_norms, bins=50, alpha=0.5, label=f"Base (u={base_norms.mean():.2f})", density=True)
+ax.hist(new_norms, bins=50, alpha=0.5, label=f"New (u={new_norms.mean():.2f})", density=True)
+ax.set_xlabel("L2 norm")
+ax.set_ylabel("Density")
+ax.set_title("Norm Distribution: Base vs New")
+ax.legend(fontsize=8)
+ax.grid(True, alpha=0.3)
+
+ax = axes[0, 1]
+ax.hist(cos_bb, bins=80, alpha=0.4, label=f"base-base (u={cos_bb.mean():.3f})", density=True)
+ax.hist(cos_nn, bins=80, alpha=0.4, label=f"new-new (u={cos_nn.mean():.3f})", density=True)
+ax.hist(cos_bn, bins=80, alpha=0.4, label=f"base-new (u={cos_bn.mean():.3f})", density=True)
+ax.set_xlabel("Cosine similarity")
+ax.set_ylabel("Density")
+ax.set_title("Pairwise Cosine Distributions")
+ax.legend(fontsize=7)
+ax.grid(True, alpha=0.3)
+
+ax = axes[0, 2]
+ax.plot(range(1, n_components+1), cumvar_base, 'b-', label=f"Base (90%@{dim90_base})")
+ax.plot(range(1, n_components+1), cumvar_new, 'r-', label=f"New (90%@{dim90_new})")
+ax.axhline(0.90, linestyle='--', color='gray', alpha=0.5, label="90% threshold")
+ax.set_xlabel("Principal component")
+ax.set_ylabel("Cumulative explained variance")
+ax.set_title("Intrinsic Dimensionality")
+ax.legend(fontsize=8)
+ax.grid(True, alpha=0.3)
+
+ax = axes[1, 0]
+if has_pre:
+    ax.hist(drift_cos, bins=80, alpha=0.5, color="coral", label=f"Base (u={drift_cos.mean():.4f})")
+    ax.hist(wake_drift_cos, bins=80, alpha=0.5, color="steelblue", label=f"Wake (u={wake_drift_cos.mean():.4f})")
+    ax.set_xlabel("Cosine similarity (pre -> post)")
+    ax.set_ylabel("Frequency")
+    ax.set_title("Embedding Drift (P3 refinement)")
+    ax.legend(fontsize=8)
+else:
+    ax.text(0.5, 0.5, "No pre-refinement\nsnapshot available",
+            ha='center', va='center', transform=ax.transAxes, fontsize=12, color='gray')
+    ax.set_title("Embedding Drift (unavailable)")
+ax.grid(True, alpha=0.3)
+
+ax = axes[1, 1]
+ax.scatter(range(BASE_VOCAB), base_norms, s=0.1, alpha=0.3, label="Base", c="blue")
+ax.scatter(range(BASE_VOCAB, vocab_size), new_norms, s=0.1, alpha=0.3, label="New", c="red")
+ax.set_xlabel("Token index")
+ax.set_ylabel("L2 norm")
+ax.set_title("Norm by Token Index")
+ax.legend(fontsize=8, markerscale=10)
+ax.grid(True, alpha=0.3)
+
+ax = axes[1, 2]
+ax.bar(range(1, 21), pca_base.explained_variance_ratio_[:20], alpha=0.5, label="Base")
+ax.bar(range(1, 21), pca_new.explained_variance_ratio_[:20], alpha=0.5, label="New")
+ax.set_xlabel("Principal component")
+ax.set_ylabel("Explained variance ratio")
+ax.set_title("Top-20 PC Eigenspectrum")
+ax.legend(fontsize=8)
+ax.grid(True, alpha=0.3)
+
+plt.tight_layout()
+analysis_plot = RUN_DIR / "p3_llama8b_analysis.png"
+plt.savefig(analysis_plot, dpi=150, bbox_inches="tight")
+print(f"\nPlot saved: {analysis_plot}")
+plt.show()
+
+"""## morpheme-specific analysis"""
+
+print("morpheme-specific analysis (compositional directions)")
+
+E_final = final_emb
+
+def analyze_morpheme_group(group, embed_matrix, tokenizer):
+    word_vecs = []
+    base_vecs = []
+    pair_labels = []
+
+    for w_ids, b_ids, (word, base) in zip(
+        group["word_ids"], group["base_ids"], group["pair_words"]
+    ):
+        w_t = torch.tensor(w_ids, dtype=torch.long)
+        b_t = torch.tensor(b_ids, dtype=torch.long)
+        word_vecs.append(embed_matrix[w_t].mean(dim=0))
+        base_vecs.append(embed_matrix[b_t].mean(dim=0))
+        pair_labels.append((word, base))
+
+    if len(word_vecs) < 2:
+        return None
+
+    word_stack = torch.stack(word_vecs)
+    base_stack = torch.stack(base_vecs)
+    directions = word_stack - base_stack
+
+    # mean direction ("morpheme vector")
+    d_mean = directions.mean(dim=0)
+
+    # cosine similarity of each direction to the mean direction
+    d_norm = F.normalize(directions, dim=1)
+    mean_norm = F.normalize(d_mean.unsqueeze(0), dim=1)
+    cosines_to_mean = (d_norm @ mean_norm.T).squeeze()
+
+    # direction magnitudes
+    magnitudes = torch.norm(directions, dim=1)
+
+    return {
+        "cosines_to_mean": cosines_to_mean,
+        "mean_cosine": cosines_to_mean.mean().item(),
+        "std_cosine": cosines_to_mean.std().item(),
+        "mean_magnitude": magnitudes.mean().item(),
+        "std_magnitude": magnitudes.std().item(),
+        "mean_direction": d_mean,
+        "pair_labels": pair_labels,
+        "n_pairs": len(word_vecs),
+    }
+
+
+# analyze all groups
+group_results = []
+for g in morpheme_groups:
+    result = analyze_morpheme_group(g, E_final, tok)
+    if result is not None:
+        result["morpheme"] = g["morpheme"]
+        result["morpheme_type"] = g["morpheme_type"]
+        group_results.append(result)
+
+# sort by direction consistency 
+group_results.sort(key=lambda x: -x["mean_cosine"])
+
+# direction-consistency delta (pre vs post) 
+dir_delta_summary = None
+if has_pre:
+    E_pre_torch = torch.from_numpy(E_pre_all).float()
+
+    pre_by_morpheme = {}
+    for g in morpheme_groups:
+        r_pre = analyze_morpheme_group(g, E_pre_torch, tok)
+        if r_pre is not None:
+            pre_by_morpheme[g["morpheme"]] = r_pre
+
+    paired = [(r, pre_by_morpheme[r["morpheme"]])
+              for r in group_results if r["morpheme"] in pre_by_morpheme]
+
+    if paired:
+        deltas = [post["mean_cosine"] - pre["mean_cosine"] for post, pre in paired]
+        mag_deltas = [post["mean_magnitude"] - pre["mean_magnitude"] for post, pre in paired]
+        mean_pre = sum(p["mean_cosine"] for _, p in paired) / len(paired)
+        mean_post = sum(p["mean_cosine"] for p, _ in paired) / len(paired)
+        mean_delta = sum(deltas) / len(deltas)
+        max_delta = max(deltas, key=abs)
+        n_improved = sum(1 for d in deltas if d > 0)
+
+        print("direction-consistency delta (pre vs post), paired by morpheme")
+        print(f"  Groups paired: {len(paired)}")
+        print(f"  Mean direction consistency: {mean_pre:.6f} -> {mean_post:.6f} "
+              f"(delta {mean_delta:+.6f})")
+        print(f"  Groups that improved: {n_improved}/{len(paired)}")
+        print(f"  Largest single-group move: {max_delta:+.6f}")
+        print(f"  Mean direction magnitude delta: {sum(mag_deltas)/len(mag_deltas):+.6f}")
+
+        print(f"\n  Largest movers (by |delta|):")
+        print(f"  {'Morpheme':>12s} {'Pairs':>5s} {'Pre':>8s} {'Post':>8s} {'Delta':>9s}")
+        print(f"  {'-'*12:>12s} {'-'*5:>5s} {'-'*8:>8s} {'-'*8:>8s} {'-'*9:>9s}")
+        for post, pre in sorted(paired,
+                                key=lambda pp: -abs(pp[0]["mean_cosine"] - pp[1]["mean_cosine"]))[:15]:
+            print(f"  {post['morpheme']:>12s} {post['n_pairs']:>5d} "
+                  f"{pre['mean_cosine']:>8.4f} {post['mean_cosine']:>8.4f} "
+                  f"{post['mean_cosine'] - pre['mean_cosine']:>+9.4f}")
+
+        print(f"\n  >> mean direction consistency movement: {mean_delta:+.6f}")
+        if abs(mean_delta) < 1e-3:
+            print("  >> Reads as NULL on the quantity L_morpheme directly optimises.")
+        else:
+            print("  >> Reads as NON-NULL. Cross-check against the isotropy delta and")
+            print("     against the L_morph training curve before claiming it.")
+
+        dir_delta_summary = {
+            "n_groups_paired": len(paired),
+            "mean_direction_consistency_pre": float(mean_pre),
+            "mean_direction_consistency_post": float(mean_post),
+            "mean_delta": float(mean_delta),
+            "n_improved": int(n_improved),
+            "max_abs_delta": float(max_delta),
+        }
+else:
+    print("\n[DIR-DELTA] No pre-refinement snapshot; direction-consistency delta skipped.")
+
+print(f"\nAnalyzed {len(group_results)} morpheme groups")
+print(f"\n  Top 15 most consistent morpheme directions:")
+print(f"  {'Morpheme':>12s} {'Type':>7s} {'Pairs':>5s} {'MeanCos':>8s} {'StdCos':>8s} {'MeanMag':>8s}")
+print(f"  {'-'*12:>12s} {'-'*7:>7s} {'-'*5:>5s} {'-'*8:>8s} {'-'*8:>8s} {'-'*8:>8s}")
+for r in group_results[:15]:
+    print(f"  {r['morpheme']:>12s} {r['morpheme_type']:>7s} {r['n_pairs']:>5d} "
+          f"{r['mean_cosine']:>8.4f} {r['std_cosine']:>8.4f} {r['mean_magnitude']:>8.4f}")
+
+print(f"\n  Bottom 10 (least consistent directions):")
+for r in group_results[-10:]:
+    print(f"  {r['morpheme']:>12s} {r['morpheme_type']:>7s} {r['n_pairs']:>5d} "
+          f"{r['mean_cosine']:>8.4f} {r['std_cosine']:>8.4f} {r['mean_magnitude']:>8.4f}")
+
+# view for a few interesting groups
+interesting = [r for r in group_results if r["morpheme"] in ["-ing", "-ed", "-s", "un-", "re-", "-ly"]]
+for r in interesting:
+    print(f"\n  === {r['morpheme']} ({r['morpheme_type']}, {r['n_pairs']} pairs) ===")
+    print(f"    Direction consistency: {r['mean_cosine']:.4f} +/- {r['std_cosine']:.4f}")
+    print(f"    Direction magnitude: {r['mean_magnitude']:.4f} +/- {r['std_magnitude']:.4f}")
+
+    # most/least aligned pairs
+    sorted_idx = r['cosines_to_mean'].argsort(descending=True)
+    print(f"    Most aligned:")
+    for i in sorted_idx[:3]:
+        w, b = r['pair_labels'][i]
+        print(f"      {w} -> {b}  (cos={r['cosines_to_mean'][i].item():.4f})")
+    print(f"    Least aligned:")
+    for i in sorted_idx[-3:]:
+        w, b = r['pair_labels'][i]
+        print(f"      {w} -> {b}  (cos={r['cosines_to_mean'][i].item():.4f})")
+
+# direction similarity between morpheme groups
+if len(group_results) >= 5:
+    print(f"\n  Cross-group direction similarity (top 20 groups):")
+    top_groups = group_results[:20]
+    dir_vecs = torch.stack([r["mean_direction"] for r in top_groups])
+    dir_normed = F.normalize(dir_vecs, dim=1)
+    cross_sim = (dir_normed @ dir_normed.T)
+
+    # most similar pairs
+    pairs = []
+    for i in range(len(top_groups)):
+        for j in range(i + 1, len(top_groups)):
+            pairs.append((cross_sim[i, j].item(), top_groups[i]["morpheme"], top_groups[j]["morpheme"]))
+    pairs.sort(reverse=True)
+
+    print(f"\n    Most similar direction pairs:")
+    for sim, m1, m2 in pairs[:10]:
+        print(f"      {m1:>10s} <-> {m2:<10s}  cos={sim:.4f}")
+
+    print(f"\n    Most different direction pairs:")
+    for sim, m1, m2 in pairs[-5:]:
+        print(f"      {m1:>10s} <-> {m2:<10s}  cos={sim:.4f}")
+
+# device group analysis 
+print("device group analysis (stylistic clustering)")
+
+device_centroids = {}
+for dg in device_groups:
+    vecs = []
+    for w_ids in dg["word_ids"]:
+        t = torch.tensor(w_ids, dtype=torch.long)
+        vecs.append(E_final[t].mean(dim=0))
+    if vecs:
+        stack = torch.stack(vecs)
+        device_centroids[dg["device"]] = stack.mean(dim=0)
+
+        # intra-group pairwise cosine
+        normed = F.normalize(stack, dim=1)
+        n = len(vecs)
+        if n > 1:
+            cos_mat = (normed @ normed.T)
+            mask_ut = torch.triu(torch.ones(n, n, dtype=torch.bool), diagonal=1)
+            intra_cos = cos_mat[mask_ut].mean().item()
+        else:
+            intra_cos = float('nan')
+
+        print(f"\n  {dg['device']:>15s} ({dg['n_valid']} words)")
+        print(f"    Intra-group mean cosine: {intra_cos:.4f}")
+
+# inter-group centroid similarity
+if len(device_centroids) >= 2:
+    names = list(device_centroids.keys())
+    cent_stack = torch.stack([device_centroids[n] for n in names])
+    cent_normed = F.normalize(cent_stack, dim=1)
+    cross_cos = (cent_normed @ cent_normed.T)
+
+    print(f"\n  Inter-group centroid cosine similarities:")
+    header = f"  {'':>15s}" + "".join(f"{n:>12s}" for n in names)
+    print(header)
+    for i, n1 in enumerate(names):
+        row = f"  {n1:>15s}"
+        for j, n2 in enumerate(names):
+            row += f"{cross_cos[i, j].item():>12.4f}"
+        print(row)
+      
+ """## post-training geometry"""
+POST_NULL = morph_null_report(torch.from_numpy(E_post), label="POST (after P3)")
+
+print("pre vs post")
+print(f"  {'quantity':>26s} {'pre':>12s} {'post':>12s} {'delta':>12s}")
+print("  " + "-" * 64)
+for k, name in (("observed_L_morph", "L_morph"),
+                ("observed_consistency", "direction consistency"),
+                ("excess_over_chance", "EXCESS OVER CHANCE")):
+    print(f"  {name:>26s} {PRE_NULL[k]:>12.6f} {POST_NULL[k]:>12.6f} "
+          f"{POST_NULL[k] - PRE_NULL[k]:>+12.6f}")
+print(f"  {'groups below z=-3':>26s} {PRE_NULL['n_groups_below_z3']:>12d} "
+      f"{POST_NULL['n_groups_below_z3']:>12d} "
+      f"{POST_NULL['n_groups_below_z3'] - PRE_NULL['n_groups_below_z3']:>+12d}")
+
+_excess_delta = POST_NULL["excess_over_chance"] - PRE_NULL["excess_over_chance"]
+print(f"\n  >> CHANGE IN EXCESS OVER CHANCE: {_excess_delta:+.6f}")
+print("  The excess is the headline, NOT the raw L_morph: the raw value moves with")
+print("  the chance floor, which moves with the group-size distribution.")
+if abs(_excess_delta) < 0.005:
+    print("  >> Reads as NULL: a properly scaled objective on audited supervision")
+    print("     did not move the geometry. This is the strong form of the null.")
+else:
+    print("  >> Reads as MOVEMENT. Cross-check the per-group table below before")
+    print("     claiming it: movement should concentrate in groups that already")
+    print("     carried structure, not appear uniformly.")
+
+# which groups moved, against which started with structure.
+_pre_by = {r["morpheme"]: r for r in PRE_NULL["per_group"]}
+_moved = []
+for r in POST_NULL["per_group"]:
+    q = _pre_by.get(r["morpheme"])
+    if q:
+        _moved.append((r["morpheme"], r["n_pairs"], q["z"], r["z"], r["z"] - q["z"],
+                       r["excess"] - q["excess"]))
+_moved.sort(key=lambda x: x[5], reverse=True)
+print(f"\n  LARGEST PER-GROUP MOVERS (excess gained)")
+print(f"  {'morpheme':>14s} {'n':>5s} {'z_pre':>8s} {'z_post':>8s} {'dz':>8s} {'d_excess':>10s}")
+for m, n, zp, zq, dz, de in _moved[:15]:
+    print(f"  {m:>14s} {n:>5d} {zp:>+8.2f} {zq:>+8.2f} {dz:>+8.2f} {de:>+10.5f}")
+print("\n  If the groups that gained are the ones that already had structure")
+print("  (the Latinate nominalisation cluster: -ion, -ation, -ition, -fication),")
+print("  the loss amplifies existing structure and cannot manufacture it. That is")
+print("  a mechanistic result, and it holds whether the global number moved or not.")
+
+TREATED_CONTROL = treated_control_geometry(E_pre, torch.from_numpy(E_post))
