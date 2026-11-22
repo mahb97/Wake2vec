@@ -2102,3 +2102,171 @@ print("  the loss amplifies existing structure and cannot manufacture it. That i
 print("  a mechanistic result, and it holds whether the global number moved or not.")
 
 TREATED_CONTROL = treated_control_geometry(E_pre, torch.from_numpy(E_post))
+
+"""## summary JSON"""
+
+report = {
+    "model": MODEL_NAME,
+    "phase": "P3_morpheme_strong_lambdas",
+    "adapter_source": str(ADAPTER_SOURCE),
+    "emb_source": str(EMB_SOURCE),
+    "checkpoint": "final",
+    "vocab_size": int(vocab_size),
+    "dim": int(dim),
+    "base_vocab": int(BASE_VOCAB),
+    "new_tokens": int(num_new),
+    "hyperparameters": {
+        "lr": LR,
+        "warmup_ratio": WARMUP_RATIO,
+        "weight_decay": WEIGHT_DECAY,
+        "max_steps": MAX_STEPS,
+        "batch_size": BATCH_SIZE,
+        "grad_accum": GRAD_ACCUM,
+        "lora_rank": LORA_RANK,
+        "lora_alpha": LORA_ALPHA,
+        "lora_targets": LORA_TARGETS,
+        "seq_len": SEQ_LEN,
+        "lambda_morph": LAMBDA_MORPH,
+        "lambda_device": LAMBDA_DEVICE,
+        "device_triplets": DEVICE_TRIPLETS,
+        "device_margin": DEVICE_MARGIN,
+        "lambda_repulsion": LAMBDA_REPULSION,
+        "lambda_norm": LAMBDA_NORM,
+        "repulsion_threshold": REPULSION_THRESHOLD,
+        "early_stop_patience": EARLY_STOP_PATIENCE,
+        "min_group_size": MIN_GROUP_SIZE,
+    },
+    "null_breaker": {
+        "isotropy_delta": iso_delta_summary,
+        "direction_consistency_delta": dir_delta_summary,
+        "permutation_pre": PRE_NULL,
+        "permutation_post": POST_NULL,
+        "excess_delta": POST_NULL["excess_over_chance"] - PRE_NULL["excess_over_chance"],
+        "treated_control": TREATED_CONTROL,
+    },
+    "morpheme_stats": {
+        "source": "wake_embedding_groups.jsonl",
+        "num_groups": morph_index.n_groups,
+        "total_pairs": morph_index.total_pairs,
+        "wake_tokens_with_morphemes": wake_tokens_with_morphemes,
+    },
+    "device_stats": {
+        "source": "device_groups.jsonl",
+        "num_groups": device_index.n_groups,
+        "total_words": device_index.total_words,
+        "groups": {dg["device"]: dg["n_valid"] for dg in device_groups},
+    },
+    "norms": {
+        "global": {"mean": float(norms.mean()), "std": float(norms.std()),
+                    "min": float(norms.min()), "max": float(norms.max())},
+        "base": {"mean": float(base_norms.mean()), "std": float(base_norms.std())},
+        "new": {"mean": float(new_norms.mean()), "std": float(new_norms.std())},
+        "welch_t": {"t": float(t_stat), "p": float(t_pval)},
+        "mann_whitney_u": {"U": float(u_stat), "p": float(u_pval)},
+        "cohens_d": float(cohens_d),
+    },
+    "isotropy": {
+        "all": {"score": float(iso_all), "mean_cos": float(cos_all), "n": int(n_all)},
+        "base": {"score": float(iso_base), "mean_cos": float(cos_base), "n": int(n_base)},
+        "new": {"score": float(iso_new), "mean_cos": float(cos_new), "n": int(n_new)},
+    },
+    "pairwise_cosine": {
+        "base_base": {"mean": float(cos_bb.mean()), "std": float(cos_bb.std())},
+        "new_new": {"mean": float(cos_nn.mean()), "std": float(cos_nn.std())},
+        "base_new": {"mean": float(cos_bn.mean()), "std": float(cos_bn.std())},
+        "ks_test_bb_vs_nn": {"D": float(ks_stat), "p": float(ks_pval)},
+    },
+    "intrinsic_dim": {
+        "base_90pct": int(dim90_base), "base_95pct": int(dim95_base),
+        "new_90pct": int(dim90_new), "new_95pct": int(dim95_new),
+        "base_top1_var": float(pca_base.explained_variance_ratio_[0]),
+        "new_top1_var": float(pca_new.explained_variance_ratio_[0]),
+    },
+    "morpheme_direction_analysis": {
+        "top_5_consistent": [
+            {"morpheme": r["morpheme"], "mean_cosine": r["mean_cosine"],
+             "n_pairs": r["n_pairs"]}
+            for r in group_results[:5]
+        ],
+        "bottom_5_consistent": [
+            {"morpheme": r["morpheme"], "mean_cosine": r["mean_cosine"],
+             "n_pairs": r["n_pairs"]}
+            for r in group_results[-5:]
+        ],
+    },
+}
+
+if has_pre:
+    report["drift"] = {
+        "base_cosine_mean": float(drift_cos.mean()),
+        "base_cosine_std": float(drift_cos.std()),
+        "base_l2_mean": float(drift_l2.mean()),
+        "wake_cosine_mean": float(wake_drift_cos.mean()),
+        "wake_cosine_std": float(wake_drift_cos.std()),
+        "wake_l2_mean": float(wake_drift_l2.mean()),
+    }
+
+if train_data:
+    report["loss"] = {
+        "final_train": float(losses[-1]),
+        "final_eval": float(v_losses[-1]) if val_data else None,
+        "best_eval": float(min(v_losses)) if val_data else None,
+    }
+
+summary_path = RUN_DIR / "p3_llama8b_summary.json"
+summary_path.write_text(json.dumps(report, indent=2))
+print(f"\n[SUMMARY] Saved to {summary_path}")
+print(json.dumps(report, indent=2))
+
+"""## wake gen test"""
+
+model.eval()
+model.config.use_cache = True
+
+
+def generate_wake(
+    prompt,
+    max_new_tokens=256,
+    temperature=0.9,
+    top_p=0.92,
+    top_k=50,
+    repetition_penalty=1.15,
+    num_return_sequences=1,
+):
+    inputs = tok(prompt, return_tensors="pt").to("cuda")
+    prompt_len = inputs["input_ids"].shape[1]
+
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            repetition_penalty=repetition_penalty,
+            num_return_sequences=num_return_sequences,
+            do_sample=True,
+            pad_token_id=tok.pad_token_id,
+        )
+
+    print(f"-- temp={temperature} | top_p={top_p} | top_k={top_k} | rep={repetition_penalty} --")
+    for i, seq in enumerate(outputs):
+        generated = tok.decode(seq[prompt_len:], skip_special_tokens=True)
+        if num_return_sequences > 1:
+            print(f"\n[{i+1}]")
+        print(generated)
+    print("-" * 60)
+
+
+def temperature_sweep(prompt, temps=[0.5, 0.7, 0.9, 1.0, 1.2], **kwargs):
+    print(f"PROMPT: {prompt}\n")
+    for t in temps:
+        generate_wake(prompt, temperature=t, **kwargs)
+        print()
+
+
+# generation
+generate_wake("riverrun, past Eve and Adam's,")
+# generate_wake("riverrun, past Eve and Adam's,", temperature=1.1)
+# generate_wake("riverrun, past Eve and Adam's,", num_return_sequences=3, temperature=0.9)
+# temperature_sweep("riverrun, past Eve and Adam's,")
