@@ -551,3 +551,203 @@ if GRAD_CKPT:
     model.gradient_checkpointing_enable(
         gradient_checkpointing_kwargs={"use_reentrant": False})
     print("  gradient checkpointing: enabled (use_reentrant=False)")
+
+"""## pre-training snapshot, the only full matrix written other than final/."""
+
+E_pre = wte.weight.detach().float().cpu().clone()
+_pre_path = RUN_DIR / "embeddings_pre.pt"
+torch.save(E_pre, _pre_path)
+print(f"  {_pre_path}")
+print(f"  shape {tuple(E_pre.shape)} dtype {E_pre.dtype} "
+      f"({E_pre.numel() * 4 / 1e6:.0f} MB)")
+
+# boundary metadata
+import json
+_meta = {
+    "model": MODEL_NAME,
+    "vocab_before": int(VOCAB_BEFORE),
+    "matrix_rows_before": int(MATRIX_ROWS_BEFORE),
+    "padding_rows_reused": int(PAD_ROWS),
+    "num_added": int(num_added),
+    "total_vocab": int(TOTAL_VOCAB),
+    "hidden": int(HIDDEN),
+    "wake_share": float(WAKE_SHARE),
+    "tie_output_head": bool(TIE_OUTPUT_HEAD),
+    "lora_target": LORA_TARGET,
+    "init": {
+        "compositional": int(comp_count),
+        "spherical": int(spherical_count),
+        "skipped_no_base": int(skipped_no_base),
+        "skipped_base_is_injected": int(skipped_all_new),
+        "target_radius": float(target_radius),
+        "radius_formula": "std*sqrt(dim) over non-zero pretrained rows",
+        "observed_mean_base_norm": float(observed_norm),
+        "radius_multiple": 1.0,
+    },
+}
+(RUN_DIR / "vocab_boundary.json").write_text(json.dumps(_meta, indent=2))
+print(f"  {RUN_DIR / 'vocab_boundary.json'}")
+print(json.dumps(_meta, indent=2))
+
+"""## callbacks"""
+
+import shutil, time, re
+from transformers import TrainerCallback
+
+
+def wake_rows_fp32():
+    return wte.weight[VOCAB_BEFORE:TOTAL_VOCAB].detach().float().cpu().clone()
+
+
+def save_wake_rows(path, step):
+    torch.save({
+        "wake_rows": wake_rows_fp32(),
+        "start": int(VOCAB_BEFORE),
+        "end": int(TOTAL_VOCAB),
+        "step": int(step),
+        "dtype": "float32",
+    }, path)
+
+
+def load_wake_rows(path):
+    obj = torch.load(path, map_location="cpu")
+    if isinstance(obj, dict) and "wake_rows" in obj:
+        rows = obj["wake_rows"]
+        start, end = obj.get("start", VOCAB_BEFORE), obj.get("end", TOTAL_VOCAB)
+    else:
+        rows = obj
+        start, end = VOCAB_BEFORE, TOTAL_VOCAB
+        if rows.shape[0] == TOTAL_VOCAB:       # a full matrix was handed in
+            rows = rows[VOCAB_BEFORE:TOTAL_VOCAB]
+    if rows.shape != (num_added, HIDDEN):
+        raise RuntimeError(
+            f"{path}: wake rows are {tuple(rows.shape)}, expected "
+            f"{(num_added, HIDDEN)}"
+        )
+    return rows.float(), int(start), int(end)
+
+
+def full_from_wake_rows(rows, pre=None):
+    E = (E_pre if pre is None else pre).clone()
+    E[VOCAB_BEFORE:TOTAL_VOCAB] = rows.float()
+    return E
+
+
+def _step_of(p):
+    m = re.search(r"(\d+)", p.name)
+    return int(m.group(1)) if m else -1
+
+
+def prune(directory, pattern, keep_every=KEEP_EVERY, keep_recent=KEEP_RECENT):
+    items = sorted(
+        [p for p in directory.glob(pattern) if _step_of(p) >= 0],
+        key=_step_of,
+    )
+    if len(items) <= keep_recent:
+        return
+    protect = set(items[-keep_recent:])
+    for p in items:
+        if p in protect or _step_of(p) % keep_every == 0:
+            continue
+        try:
+            shutil.rmtree(p) if p.is_dir() else p.unlink()
+        except Exception as e:
+            print(f"[PRUNE] {p.name}: {e}")
+
+
+class EmbeddingSnapshot(TrainerCallback):
+    def on_step_end(self, args, state, control, **kw):
+        s = state.global_step
+        if s > 0 and s % EMB_SNAP_STEPS == 0:
+            try:
+                save_wake_rows(EMB_SNAPS / f"wake_step{s:05d}.pt", s)
+                prune(EMB_SNAPS, "wake_step*.pt")
+                print(f"[EMB] step {s}: wake rows saved")
+            except Exception as e:
+                print(f"[EMB] step {s}: {e}")
+
+
+class FullCheckpoint(TrainerCallback):
+    def on_save(self, args, state, control, **kw):
+        try:
+            s = state.global_step
+            d = FULL_CHECKPOINTS / f"step_{s:05d}"
+            if d.exists():
+                shutil.rmtree(d)
+            d.mkdir(parents=True, exist_ok=True)
+            model.save_pretrained(str(d), save_embedding_layers=False)
+            tok.save_pretrained(str(d))
+            save_wake_rows(d / "wake_rows.pt", s)
+            torch.save({
+                "global_step": s,
+                "best_metric": state.best_metric,
+                "epoch": state.epoch,
+                "tie_output_head": bool(TIE_OUTPUT_HEAD),
+            }, d / "training_state.pt")
+            prune(FULL_CHECKPOINTS, "step_*")
+            print(f"[FULL] step {s}: saved")
+        except Exception as e:
+            print(f"[FULL] step {state.global_step}: {e}")
+
+
+def has_weights(ck):
+    return (ck / "adapter_model.safetensors").exists() or \
+           (ck / "pytorch_model.bin").exists()
+
+
+class SentryMirror(TrainerCallback):
+    def on_save(self, args, state, control, **kw):
+        try:
+            cks = sorted(LOCAL_RUN.glob("checkpoint-*"),
+                         key=_step_of, reverse=True)
+            if not cks or not has_weights(cks[0]):
+                return
+            ck = cks[0]
+            dst = SENTRY / ck.name
+            if dst.exists():
+                return
+            shutil.copytree(ck, dst)
+            # adapter carries no embedding (save_embedding_layers=False), so a resume from this directory needs the Wake rows alongside it.
+            save_wake_rows(dst / "wake_rows.pt", state.global_step)
+            prune(SENTRY, "checkpoint-*")
+            print(f"[SENTRY] {ck.name}: mirrored (+ wake rows)")
+        except Exception as e:
+            print(f"[SENTRY] {e}")
+
+
+class LossMonitor(TrainerCallback):
+    def __init__(self):
+        self.last_train = None
+
+    def on_log(self, args, state, control, logs=None, **kw):
+        if not logs:
+            return
+        if "loss" in logs:
+            self.last_train = logs["loss"]
+        if "eval_loss" in logs and self.last_train is not None:
+            gap = logs["eval_loss"] - self.last_train
+            if gap > 3.0:
+                print(f"[WARN] train/eval gap {gap:.2f}")
+
+
+class StepTimer(TrainerCallback):
+    def __init__(self):
+        self.times, self.last = [], None
+
+    def on_step_end(self, args, state, control, **kw):
+        now = time.time()
+        if self.last is not None:
+            self.times.append(now - self.last)
+            if state.global_step % 10 == 0:
+                recent = self.times[-10:]
+                print(f"[{state.global_step:5d}] "
+                      f"{sum(recent) / len(recent):.1f}s/step")
+        self.last = now
+
+
+print("Callbacks:")
+print(f"  EmbeddingSnapshot  every {EMB_SNAP_STEPS} steps, Wake rows fp32")
+print(f"  FullCheckpoint     every {SAVE_STEPS} steps, adapter + Wake rows")
+print(f"  SentryMirror       mirror to Drive, pruned")
+print(f"  retention          keep every {KEEP_EVERY}th + last {KEEP_RECENT}")
+print("  LossMonitor, StepTimer")
